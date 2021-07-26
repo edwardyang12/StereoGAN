@@ -1,0 +1,14 @@
+Generator: input is images, output is images (feature extraction and then
+standard feature generator)
+Discriminator: input is images, output is t/f (feature extraction and then
+standard discriminator)
+1. Train generator with stereo vision model loss + adversarial loss,
+backpropogate up to images
+
+2. Train discriminator with adversarial loss, backpropagate up to distribution
+
+How do we sample patches from these images and backpropogate using them?
+- batchwise patching -> distribution
+- how would we select patches from a single image?
+- patch: for whole image, crop patches of it and produce outputs using it  
+Convert them into distribution (feature extract on patch/ batch)?
