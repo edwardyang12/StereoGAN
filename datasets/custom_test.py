@@ -73,7 +73,5 @@ class CustomDatasetTest(Dataset):
                 "right": right_img,
                 "disparity": disparity,
                 "label": label,
-                "top_pad": top_pad,
-                "right_pad": right_pad,
                 "intrinsic": intrinsic,
                 "baseline": baseline}

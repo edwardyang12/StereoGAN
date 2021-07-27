@@ -12,3 +12,5 @@ How do we sample patches from these images and backpropogate using them?
 - how would we select patches from a single image?
 - patch: for whole image, crop patches of it and produce outputs using it  
 Convert them into distribution (feature extract on patch/ batch)?
+
+Real distribution: get scenes from real dataset

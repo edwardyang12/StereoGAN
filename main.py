@@ -1,4 +1,6 @@
 import torch
+import torch.nn as nn
+import torch.optim as optim
 
 from nets.discriminator import Discriminator
 from nets.generator import Generator
@@ -14,7 +16,7 @@ trainlist = "./filenames/custom_test_sim.txt"
 dataset = CustomDatasetTest(datapath, trainlist)
 
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                         shuffle=True, num_workers=workers)
+                                         shuffle=True, num_workers=num_workers)
 
 device = torch.device("cuda" if (torch.cuda.is_available()) else "cpu")
 
@@ -28,7 +30,7 @@ def weights_init(m):
 
 netG = Generator().to(device)
 netG.apply(weights_init)
-netD = Discriminator(ngpu).to(device)
+netD = Discriminator().to(device)
 netD.apply(weights_init)
 
 criterion = nn.BCELoss()
@@ -40,8 +42,8 @@ real_label = 1.
 fake_label = 0.
 
 # Setup Adam optimizers for both G and D
-optimizerD = optim.Adam(netD.parameters(), lr=lr))
-optimizerG = optim.Adam(netG.parameters(), lr=lr))
+optimizerD = optim.Adam(netD.parameters(), lr=lr)
+optimizerG = optim.Adam(netG.parameters(), lr=lr)
 
 G_losses = []
 D_losses = []
