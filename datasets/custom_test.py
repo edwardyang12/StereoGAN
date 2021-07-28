@@ -58,10 +58,6 @@ class CustomDatasetTest(Dataset):
             temp[temp==inf] = 0
             disparity = temp
 
-        if self.label_filenames:
-            temp = os.path.join(self.datapath, self.label_filenames[index])
-            label = np.array(Image.open(temp).resize((960,540), resample=Image.NEAREST))
-
 
         processed = get_transform()
         left_img = processed(left_img).numpy()

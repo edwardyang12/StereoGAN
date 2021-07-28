@@ -10,7 +10,7 @@ def get_transform():
     return transforms.Compose([
         # transforms.ColorJitter(brightness=1, contrast=1),
         transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std),
+        # transforms.Normalize(mean=mean, std=std),
     ])
 
 

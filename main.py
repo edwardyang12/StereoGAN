@@ -14,9 +14,9 @@ from datasets.custom_test import CustomDatasetTest
 lr = 0.0002
 num_epochs = 5
 batch_size = 10
-num_workers = 0
+num_workers = 3
 datapath = "./linked_v9"
-trainlist = "./filenames/custom_val_full.txt"
+trainlist = "./filenames/custom_train_full.txt"
 
 dataset = CustomDatasetTest(datapath, trainlist)
 
