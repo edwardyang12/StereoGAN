@@ -16,6 +16,7 @@ num_epochs = 5
 batch_size = 10
 num_workers = 3
 datapath = "./linked_v9"
+ngpu = 4
 trainlist = "./filenames/custom_train_full.txt"
 
 dataset = CustomDatasetTest(datapath, trainlist)
@@ -35,7 +36,12 @@ def weights_init(m):
 
 netG = Generator().to(device)
 netG.apply(weights_init)
+if (device.type == 'cuda') and (ngpu > 1):
+    netG = nn.DataParallel(netG, list(range(ngpu)))
+
 netD = Discriminator().to(device)
+if (device.type == 'cuda') and (ngpu > 1):
+    netD = nn.DataParallel(netD, list(range(ngpu)))
 netD.apply(weights_init)
 
 criterion = nn.BCELoss()
