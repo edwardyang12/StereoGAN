@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 class Generator(nn.Module):
-    def __init__(self, channels=3, lat_vector=100, feat_map=128):
+    def __init__(self, channels=1, lat_vector=100, feat_map=128):
         super(Generator, self).__init__()
 
         self.main = nn.Sequential(

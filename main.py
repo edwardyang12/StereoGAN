@@ -15,8 +15,8 @@ lr = 0.0002
 num_epochs = 5
 batch_size = 10
 num_workers = 0
-datapath = "./linked_sim_v9"
-trainlist = "./filenames/custom_test_sim.txt"
+datapath = "./linked_v9"
+trainlist = "./filenames/custom_val_full.txt"
 
 dataset = CustomDatasetTest(datapath, trainlist)
 
@@ -122,7 +122,7 @@ for epoch in range(num_epochs):
 
         if (i%100 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
             with torch.no_grad():
-                fake = netG(fixed_noise).detach().cpu()
+                fake = netG(fixed_noise).detach().cpu().numpy()
             # img = vutils.make_grid(fake, padding=2, normalize=True)
 
             img = Image.fromarray(fake[0][0],'L')

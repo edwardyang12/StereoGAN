@@ -11,7 +11,7 @@ import cv2
 class CustomDatasetTest(Dataset):
     def __init__(self, datapath, list_filename):
         self.datapath = datapath
-        self.left_filenames, self.right_filenames, self.disp_filenames, self.meta_filenames, self.label_filenames = self.load_path(list_filename)
+        self.left_filenames, self.right_filenames, self.disp_filenames, self.meta_filenames = self.load_path(list_filename)
 
     def load_path(self, list_filename):
         lines = read_all_lines(list_filename)
@@ -21,9 +21,8 @@ class CustomDatasetTest(Dataset):
 
         disp_images = [x[2] for x in splits]
         meta = [x[3] for x in splits]
-        label = [x[4] for x in splits]
 
-        return left_images, right_images, disp_images, meta, label
+        return left_images, right_images, disp_images, meta
 
     def load_image(self, filename):
         img = np.array(Image.open(filename).convert('L')).astype(np.float32)
@@ -69,9 +68,4 @@ class CustomDatasetTest(Dataset):
         right_img = processed(right_img).numpy()
 
 
-        return {"left": left_img,
-                "right": right_img,
-                "disparity": disparity,
-                "label": label,
-                "intrinsic": intrinsic,
-                "baseline": baseline}
+        return left_img
