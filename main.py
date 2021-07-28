@@ -72,7 +72,7 @@ for epoch in range(num_epochs):
 
         label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
         # Forward pass real batch through D
-        output = netD(real_cpu)[:,:,0,0].view(-1)
+        output = torch.mean(netD(real_cpu),dim=(2,3)).view(-1)
         # Calculate loss on all-real batch
         errD_real = criterion(output, label)
         # Calculate gradients for D in backward pass
@@ -81,12 +81,12 @@ for epoch in range(num_epochs):
 
         ## Train with all-fake batch
         # Generate batch of latent vectors
-        noise = torch.randn(b_size, 100, 13, 27, device=device) # the size of the image (3,544,960)
+        noise = torch.randn(b_size, 100, 13, 27, device=device) # the size of the image (3,256,480)
         # Generate fake image batch with G
         fake = netG(noise)
         label.fill_(fake_label)
         # Classify all fake batch with D
-        output = netD(fake.detach())[:,:,0,0].view(-1)
+        output = torch.mean(netD(fake.detach()),dim=(2,3)).view(-1)
         # Calculate D's loss on the all-fake batch
         errD_fake = criterion(output, label)
         # Calculate the gradients for this batch, accumulated (summed) with previous gradients
@@ -103,7 +103,7 @@ for epoch in range(num_epochs):
         netG.zero_grad()
         label.fill_(real_label)  # fake labels are real for generator cost
         # Since we just updated D, perform another forward pass of all-fake batch through D
-        output = netD(fake)[:,:,0,0].view(-1)
+        output = torch.mean(netD(fake),dim=(2,3)).view(-1)
         # Calculate G's loss based on this output
         errG = criterion(output, label)
         # Calculate gradients for G
@@ -124,8 +124,8 @@ for epoch in range(num_epochs):
             with torch.no_grad():
                 fake = netG(fixed_noise).detach().cpu()
             # img = vutils.make_grid(fake, padding=2, normalize=True)
-            img = np.transpose(fake[0].numpy(),(1,2,0))
-            img = Image.fromarray(img,'RGB')
+
+            img = Image.fromarray(fake[0][0],'L')
             img.save('fake'+str(epoch)+'_'+str(i)+'.png')
 
         # Save Losses for plotting later

@@ -26,7 +26,7 @@ class CustomDatasetTest(Dataset):
         return left_images, right_images, disp_images, meta, label
 
     def load_image(self, filename):
-        img = np.array(Image.open(filename).convert('RGB')).astype(np.float32)
+        img = np.array(Image.open(filename).convert('L')).astype(np.float32)
         # img = cv2.GaussianBlur(img,(9, 9),0.1,2)
         return (Image.fromarray(img.astype(np.uint8))).resize((480,256), resample=Image.NEAREST)
 
