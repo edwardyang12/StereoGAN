@@ -1,6 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torchvision.utils as vutils
+
+import numpy as np
+import time
+from PIL import Image
 
 from nets.discriminator import Discriminator
 from nets.generator import Generator
@@ -35,7 +40,7 @@ netD.apply(weights_init)
 
 criterion = nn.BCELoss()
 
-fixed_noise = torch.randn(128, 100, 1, 1, device=device)
+fixed_noise = torch.randn(128, 100, 13, 27, device=device)
 
 # Establish convention for real and fake labels during training
 real_label = 1.
@@ -53,7 +58,8 @@ print("Starting Training Loop...")
 # For each epoch
 for epoch in range(num_epochs):
     # For each batch in the dataloader
-    for i, data in enumerate(dataloader, 0):
+    start = time.time()
+    for i, data in enumerate(dataloader):
 
         ############################
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -61,11 +67,12 @@ for epoch in range(num_epochs):
         ## Train with all-real batch
         netD.zero_grad()
         # Format batch
-        real_cpu = data[0].to(device)
+        real_cpu = data.to(device)
         b_size = real_cpu.size(0)
+
         label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
         # Forward pass real batch through D
-        output = netD(real_cpu).view(-1)
+        output = netD(real_cpu)[:,:,0,0].view(-1)
         # Calculate loss on all-real batch
         errD_real = criterion(output, label)
         # Calculate gradients for D in backward pass
@@ -74,12 +81,12 @@ for epoch in range(num_epochs):
 
         ## Train with all-fake batch
         # Generate batch of latent vectors
-        noise = torch.randn(b_size, nz, 1, 1, device=device)
+        noise = torch.randn(b_size, 100, 13, 27, device=device) # the size of the image (3,544,960)
         # Generate fake image batch with G
         fake = netG(noise)
         label.fill_(fake_label)
         # Classify all fake batch with D
-        output = netD(fake.detach()).view(-1)
+        output = netD(fake.detach())[:,:,0,0].view(-1)
         # Calculate D's loss on the all-fake batch
         errD_fake = criterion(output, label)
         # Calculate the gradients for this batch, accumulated (summed) with previous gradients
@@ -96,7 +103,7 @@ for epoch in range(num_epochs):
         netG.zero_grad()
         label.fill_(real_label)  # fake labels are real for generator cost
         # Since we just updated D, perform another forward pass of all-fake batch through D
-        output = netD(fake).view(-1)
+        output = netD(fake)[:,:,0,0].view(-1)
         # Calculate G's loss based on this output
         errG = criterion(output, label)
         # Calculate gradients for G
@@ -110,6 +117,16 @@ for epoch in range(num_epochs):
             print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
                   % (epoch, num_epochs, i, len(dataloader),
                      errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
+            print(time.time()-start)
+            start = time.time()
+
+        if (i%100 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
+            with torch.no_grad():
+                fake = netG(fixed_noise).detach().cpu()
+            # img = vutils.make_grid(fake, padding=2, normalize=True)
+            img = np.transpose(fake[0].numpy(),(1,2,0))
+            img = Image.fromarray(img,'RGB')
+            img.save('fake'+str(epoch)+'_'+str(i)+'.png')
 
         # Save Losses for plotting later
         G_losses.append(errG.item())
