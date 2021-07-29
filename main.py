@@ -13,7 +13,7 @@ from datasets.custom_test import CustomDatasetTest
 
 lr = 0.0002
 num_epochs = 5
-batch_size = 10
+batch_size = 128
 beta1 = 0.5
 num_workers = 3
 datapath = "./linked_v9"
@@ -47,7 +47,8 @@ netD.apply(weights_init)
 
 criterion = nn.BCELoss()
 
-fixed_noise = torch.randn(128, 100, 13, 27, device=device)
+# fixed_noise = torch.randn(128, 100, 13, 27, device=device)
+fixed_noise = torch.randn(128, 100, 1, 1, device=device)
 
 # Establish convention for real and fake labels during training
 real_label = 1.
@@ -88,7 +89,9 @@ for epoch in range(num_epochs):
 
         ## Train with all-fake batch
         # Generate batch of latent vectors
-        noise = torch.randn(b_size, 100, 13, 27, device=device) # the size of the image (3,256,480)
+        # noise = torch.randn(b_size, 100, 13, 27, device=device)
+        noise = torch.randn(b_size, 100, 1, 1, device=device) # the size of the image (3,256,480)
+
         # Generate fake image batch with G
         fake = netG(noise)
         label.fill_(fake_label)
