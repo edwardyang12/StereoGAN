@@ -14,6 +14,7 @@ from datasets.custom_test import CustomDatasetTest
 lr = 0.0002
 num_epochs = 5
 batch_size = 10
+beta1 = 0.5
 num_workers = 3
 datapath = "./linked_v9"
 ngpu = 4
@@ -53,8 +54,8 @@ real_label = 1.
 fake_label = 0.
 
 # Setup Adam optimizers for both G and D
-optimizerD = optim.Adam(netD.parameters(), lr=lr)
-optimizerG = optim.Adam(netG.parameters(), lr=lr)
+optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
 G_losses = []
 D_losses = []
@@ -126,12 +127,13 @@ for epoch in range(num_epochs):
             print(time.time()-start)
             start = time.time()
 
-        if (i%100 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
+        if (iters%200 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
             with torch.no_grad():
                 fake = netG(fixed_noise).detach().cpu().numpy()
             # img = vutils.make_grid(fake, padding=2, normalize=True)
 
-            img = Image.fromarray(fake[0][0],'L')
+            img = fake[0][0]*255
+            img = Image.fromarray(img.astype(np.uint8),'L')
             img.save('fake'+str(epoch)+'_'+str(i)+'.png')
 
         # Save Losses for plotting later
