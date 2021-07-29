@@ -9,7 +9,7 @@ def get_transform():
 
     return transforms.Compose([
         # transforms.CenterCrop(540),
-        transforms.Resize(64),
+        transforms.Resize(512),
         transforms.ToTensor(),
         # transforms.Normalize(mean=mean, std=std),
     ])

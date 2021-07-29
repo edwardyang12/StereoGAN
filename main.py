@@ -13,17 +13,25 @@ from datasets.custom_test import CustomDatasetTest
 
 lr = 0.0002
 num_epochs = 5
-batch_size = 128
+batch_size = 4
 beta1 = 0.5
 num_workers = 3
-datapath = "./linked_v9"
 ngpu = 4
-trainlist = "./filenames/custom_train_full.txt"
+datapath = "./linked_real_v9"
+trainlist = "./filenames/custom_test_real.txt"
+
+simpath = "./linked_sim_v9"
+simlist = "./filenames/custom_test_sim.txt"
 
 dataset = CustomDatasetTest(datapath, trainlist)
+simset = CustomDatasetTest(simpath, simlist)
+
 
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                         shuffle=True, num_workers=num_workers)
+                                         shuffle=False, num_workers=num_workers)
+simloader = torch.utils.data.DataLoader(simset, batch_size=batch_size,
+                                         shuffle=False, num_workers=num_workers)
+
 
 device = torch.device("cuda" if (torch.cuda.is_available()) else "cpu")
 
@@ -67,15 +75,19 @@ print("Starting Training Loop...")
 for epoch in range(num_epochs):
     # For each batch in the dataloader
     start = time.time()
-    for i, data in enumerate(dataloader):
+    for data, simdata in zip(enumerate(dataloader), enumerate(simloader)):
+        i, data = data
+        j, simdata = simdata
 
         ############################
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         ###########################
         ## Train with all-real batch
         netD.zero_grad()
-        # Format batch
+
         real_cpu = data.to(device)
+        simdata = simdata.to(device)
+
         b_size = real_cpu.size(0)
 
         label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
@@ -90,10 +102,10 @@ for epoch in range(num_epochs):
         ## Train with all-fake batch
         # Generate batch of latent vectors
         # noise = torch.randn(b_size, 100, 13, 27, device=device)
-        noise = torch.randn(b_size, 100, 1, 1, device=device) # the size of the image (3,256,480)
+        # noise = torch.randn(b_size, 100, 1, 1, device=device) # the size of the image (3,256,480)
 
         # Generate fake image batch with G
-        fake = netG(noise)
+        fake = netG(simdata)
         label.fill_(fake_label)
         # Classify all fake batch with D
         output = torch.mean(netD(fake.detach()),dim=(2,3)).view(-1)
