@@ -2,10 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils as vutils
+import torchvision.transforms.functional as F
 
 import numpy as np
 import time
 from PIL import Image
+import matplotlib.pyplot as plt
 
 from nets.discriminator import Discriminator
 from nets.generator import Generator
@@ -17,6 +19,7 @@ batch_size = 4
 beta1 = 0.5
 num_workers = 3
 ngpu = 4
+patch = 64 # patch size
 datapath = "./linked_real_v9"
 trainlist = "./filenames/custom_test_real.txt"
 
@@ -88,11 +91,16 @@ for epoch in range(num_epochs):
         real_cpu = data.to(device)
         simdata = simdata.to(device)
 
-        b_size = real_cpu.size(0)
+        b_size,channels,h,w = real_cpu.shape
 
         label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
+
         # Forward pass real batch through D
-        output = torch.mean(netD(real_cpu),dim=(2,3)).view(-1)
+
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_real = F.crop(real_cpu, top, left, patch, patch)
+        output = torch.mean(netD(cropped_real),dim=(2,3)).view(-1)
         # Calculate loss on all-real batch
         errD_real = criterion(output, label)
         # Calculate gradients for D in backward pass
@@ -107,8 +115,10 @@ for epoch in range(num_epochs):
         # Generate fake image batch with G
         fake = netG(simdata)
         label.fill_(fake_label)
+
         # Classify all fake batch with D
-        output = torch.mean(netD(fake.detach()),dim=(2,3)).view(-1)
+        cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
+        output = torch.mean(netD(cropped_fake),dim=(2,3)).view(-1)
         # Calculate D's loss on the all-fake batch
         errD_fake = criterion(output, label)
         # Calculate the gradients for this batch, accumulated (summed) with previous gradients
@@ -156,3 +166,12 @@ for epoch in range(num_epochs):
         D_losses.append(errD.item())
 
         iters += 1
+
+plt.figure(figsize=(10,5))
+plt.title("Generator and Discriminator Loss During Training")
+plt.plot(G_losses,label="G")
+plt.plot(D_losses,label="D")
+plt.xlabel("iterations")
+plt.ylabel("Loss")
+plt.legend()
+plt.savefig('lossgraph.png')

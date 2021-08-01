@@ -1,61 +1,59 @@
 import torch.nn as nn
+import torch
 
-# going down
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.single_conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 4, 2, 1, bias=False),
+        self.double_conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(True),
+            nn.ReLU(inplace=True),
         )
     def forward(self, x):
-        return self.single_conv(x)
+        return self.double_conv(x)
 
-# going up
-class ConvTransposeBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.single_conv = nn.Sequential(
-            nn.ConvTranspose2d(in_channels, out_channels, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(True),
-        )
-    def forward(self, x):
-        return self.single_conv(x)
-
-class Generator(nn.Module):
-    def __init__(self, channels=1, lat_vector=100, feat_map=64):
-        super(Generator, self).__init__()
-
-        # input is Z, going into a convolution
-        self.down1 = ConvBlock(channels,feat_map)
-        self.down2 = ConvBlock(feat_map,feat_map*2)
-        self.down3 = ConvBlock(feat_map*2,feat_map*4)
-        self.down4 = ConvBlock(feat_map*4,feat_map*8)
-        self.down5 = ConvBlock(feat_map*8,feat_map*16)
-
-        self.up1 = ConvTransposeBlock(feat_map*16, feat_map*8)
-        self.up2 = ConvTransposeBlock(feat_map*8, feat_map*4)
-        self.up3 = ConvTransposeBlock(feat_map*4, feat_map*2)
-        self.up4 = ConvTransposeBlock(feat_map*2, feat_map)
-
-        self.up5 = nn.ConvTranspose2d(feat_map, channels, 4, 2, 1, bias=False)
-        self.out = nn.Tanh()
-        # state size. (channels) x 64 x 64
+class MiniUNet(nn.Module):
+    def __init__(self):
+        super(MiniUNet,self).__init__()
+        self.input = ConvBlock(1,64)
+        self.max_pool_1 = nn.MaxPool2d(2)
+        self.down_1 = ConvBlock(64,128)
+        self.max_pool_2 = nn.MaxPool2d(2)
+        self.down_2 = ConvBlock(128,256)
+        self.max_pool_3 = nn.MaxPool2d(2)
+        self.bottom = ConvBlock(256,512)
+        self.temp_1 = nn.Conv2d(512,256, kernel_size=3, padding=1)
+        self.up_sample_1 = nn.Upsample(scale_factor=2, mode='bilinear',align_corners=True)
+        self.up_1 = ConvBlock(512,256)
+        self.temp_2 = nn.Conv2d(256,128, kernel_size=3, padding=1)
+        self.up_sample_2 = nn.Upsample(scale_factor=2, mode='bilinear',align_corners=True)
+        self.up_2 = ConvBlock(256,128)
+        self.temp_3 = nn.Conv2d(128,64, kernel_size=3, padding=1)
+        self.up_sample_3 = nn.Upsample(scale_factor=2, mode='bilinear',align_corners=True)
+        self.up_3 = ConvBlock(128,64)
+        self.temp_4 = nn.Conv2d(64,1, kernel_size=3, padding=1 )
 
 
-    def forward(self, input):
-        x = self.down1(input)
-        x = self.down2(x)
-        x = self.down3(x)
-        x = self.down4(x)
-        x = self.down5(x)
-        x = self.up1(x)
-        x = self.up2(x)
-        x = self.up3(x)
-        x = self.up4(x)
-        x = self.up5(x)
-        x = self.out(x)
+    def forward(self,x):
+        x1 = self.input(x)
+        x2 = self.max_pool_1(x1)
+        x2 = self.down_1(x2)
+        x3 = self.max_pool_2(x2)
+        x3 = self.down_2(x3)
+        x3_1 = self.max_pool_3(x3)
+        x3_1 = self.bottom(x3_1)
+        x4 = nn.ReLU()(self.temp_1(x3_1))
+        x4 = self.up_sample_1(x4)
+        x4 = torch.cat((x3,x4),dim=1)
+        x4 = self.up_1(x4)
+        x5 = nn.ReLU()(self.temp_2(x4))
+        x5 = self.up_sample_2(x5)
+        x5 = torch.cat((x2,x5),dim=1)
+        x5 = self.up_2(x5)
+        x6 = nn.ReLU()(self.temp_3(x5))
+        x6 = self.up_sample_3(x6)
+        x6 = torch.cat((x1,x6),dim=1)
+        x6 = self.up_3(x6)
+        x7 = nn.Tanh()(self.temp_4(x6))
 
-        return x
+        return x7
