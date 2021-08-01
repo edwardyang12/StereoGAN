@@ -144,7 +144,7 @@ for epoch in range(num_epochs):
 
         if (iters%200 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
             with torch.no_grad():
-                fake = netG(fixed_noise).detach().cpu().numpy()
+                fake = netG(simdata).detach().cpu().numpy()
             # img = vutils.make_grid(fake, padding=2, normalize=True)
 
             img = fake[0][0]*255

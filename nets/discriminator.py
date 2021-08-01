@@ -6,19 +6,18 @@ class Discriminator(nn.Module):
         self.main = nn.Sequential(
             # input is (channels) x 512 x 512
             nn.Conv2d(channels, feat_map, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(feat_map * 256),
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.Conv2d(feat_map, feat_map * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(feat_map * 128),
+            nn.BatchNorm2d(feat_map * 2),
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.Conv2d(feat_map * 2, feat_map * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(feat_map * 64),
+            nn.BatchNorm2d(feat_map * 4),
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.Conv2d(feat_map * 4, feat_map * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(feat_map * 32),
+            nn.BatchNorm2d(feat_map * 8),
             nn.LeakyReLU(0.2, inplace=True),
 
             # state size. (feat_map) x 32 x 32
