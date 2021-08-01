@@ -47,7 +47,7 @@ def weights_init(m):
         nn.init.constant_(m.bias.data, 0)
 
 netG = Generator().to(device)
-netG.apply(weights_init)
+# netG.apply(weights_init)
 if (device.type == 'cuda') and (ngpu > 1):
     netG = nn.DataParallel(netG, list(range(ngpu)))
 

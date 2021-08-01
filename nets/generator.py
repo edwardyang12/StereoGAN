@@ -12,9 +12,9 @@ class ConvBlock(nn.Module):
     def forward(self, x):
         return self.double_conv(x)
 
-class MiniUNet(nn.Module):
+class Generator(nn.Module):
     def __init__(self):
-        super(MiniUNet,self).__init__()
+        super(Generator,self).__init__()
         self.input = ConvBlock(1,64)
         self.max_pool_1 = nn.MaxPool2d(2)
         self.down_1 = ConvBlock(64,128)
