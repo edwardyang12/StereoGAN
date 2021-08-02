@@ -377,12 +377,12 @@ class PSMNet(nn.Module):
 
 
     def forward(self, left, right):
-        print("left input: ", left.shape, left)
+        #print("left input: ", left.shape, left)
 
         left_g = self.generator(left)
         right_g = self.generator(right)
 
-        print("left g: ", left_g.shape, left_g)
+        #print("left g: ", left_g.shape, left_g)
 
 
         refimg_msfea = self.feature_extraction(left_g)
