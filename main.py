@@ -374,6 +374,7 @@ def train_sample(sample, indx, compute_metrics=False):
     ])
     if indx % ((len(TrainImgLoader) / len(RealImgLoader)) + 1) == 0:
         real_data = next(iter(RealImgLoader))['left']
+        real_data = real_data.cuda()
         real_data = transform(real_data)
 
         b_size = real_data.size(0)
