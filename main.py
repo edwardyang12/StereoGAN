@@ -368,7 +368,7 @@ def train_sample(sample, indx, compute_metrics=False):
     #print(disp_gt.shape)
     #disp_gt_a = disp_gt
     discriminator.zero_grad()
-    label = torch.full((2,), real_label, dtype=torch.float, device=imgL.device)
+    label = torch.full((1,), real_label, dtype=torch.float, device=imgL.device)
     transform = transforms.Compose([
         transforms.RandomCrop(64)
     ])
