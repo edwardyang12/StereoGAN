@@ -1,7 +1,7 @@
-from models.gwcnet import GwcNet
-from models.loss import model_psmnet_loss, stereo_psmnet_loss
-from models.loss import model_gwcnet_loss
-from models.psmnet import PSMNet
+from nets.gwcnet import GwcNet
+from nets.loss import model_psmnet_loss, stereo_psmnet_loss
+from nets.loss import model_gwcnet_loss
+from nets.psmnet import PSMNet
 
 __models__ = {
     "gwcnet": GwcNet,
