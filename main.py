@@ -434,7 +434,7 @@ def train_sample(sample, indx, compute_metrics=False):
     disp_ests = [outputs_stage["pred1"], outputs_stage["pred2"], outputs_stage["pred3"]]
 
     scalar_outputs = {"loss": loss}
-    image_outputs = {"disp_est": disp_ests, "disp_gt": disp_gt, "imgL": imgL, "imgR": imgR, "G_output_l": outputs['left_g'], "G_output_r": output['right_g']}
+    image_outputs = {"disp_est": disp_ests, "disp_gt": disp_gt, "imgL": imgL, "imgR": imgR, "G_output_l": outputs['left_g'], "G_output_r": outputs['right_g']}
     #text_outputs = {}
 
 
