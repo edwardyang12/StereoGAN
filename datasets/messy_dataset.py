@@ -16,7 +16,7 @@ class MESSYDataset(Dataset):
     def __init__(self, datapath, list_filename, training, crop_width, crop_height, test_crop_width, test_crop_height, left_img, right_img, args):
         self.datapath = datapath
         self.training = training
-        #self.depthpath = depthpath
+        self.depthpath = args.depthpath
         self.left_img = left_img
         self.right_img = right_img
         self.args = args
@@ -118,8 +118,10 @@ class MESSYDataset(Dataset):
 
 
         if self.disp_filenames_L:  # has disparity ground truth
-
-            path = self.datapath
+            if self.left_img == "1024_irL_real_1080.png":
+                path = self.depthpath
+            else:
+                path = self.datapath
             b, br, f, depthL, depthR, depth, disparity_L, disparity_R, disparity = self.load_disp(os.path.join(path, self.disp_filenames_L[index]), \
                                                     os.path.join(path, self.disp_filenames_R[index]), \
                                                     os.path.join(path, self.disp_filenames[index]), \
