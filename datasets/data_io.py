@@ -3,14 +3,50 @@ import re
 import torchvision.transforms as transforms
 
 
-def get_transform():
+def get_transform_train(color_jitter, kernel, var, use_blur, use_jitter):
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+    #print(color_jitter.brightness)
+    _, b, c, _, _ = transforms.ColorJitter.get_params(color_jitter.brightness, color_jitter.contrast, color_jitter.saturation, color_jitter.hue)
+    if use_blur and use_jitter:
+        return transforms.Compose([
+            transforms.ColorJitter(brightness=(b,b), contrast=(c,c), saturation=0, hue=0),
+            transforms.GaussianBlur(kernel,var),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean, std=std)
+        ])
+    else:
+        if use_blur:
+            return transforms.Compose([
+                transforms.GaussianBlur(kernel,var),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=mean, std=std)
+            ])
+        elif use_jitter:
+            return transforms.Compose([
+                transforms.ColorJitter(brightness=(b,b), contrast=(c,c), saturation=0, hue=0),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=mean, std=std)
+            ])
+        else:
+            return transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(mean=mean, std=std)
+            ])
+
+
+def get_transform_test():
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
 
     return transforms.Compose([
-        # transforms.ColorJitter(brightness=1, contrast=1),
         transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std),
+        transforms.Normalize(mean=mean, std=std)
+    ])
+
+def get_transform_img():
+    return transforms.Compose([
+        transforms.ToTensor()
     ])
 
 

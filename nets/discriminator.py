@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 class Discriminator(nn.Module):
-    def __init__(self, channels=3, lat_vector=100, feat_map=128):
+    def __init__(self, channels=3, feat_map=128):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(
             # input is (channels) x 64 x 64
