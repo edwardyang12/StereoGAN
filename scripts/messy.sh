@@ -23,7 +23,7 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/m
     --depthpath /cephfs/datasets/iccv_pnp/messy-table-dataset/real_v9/training \
     --epochs 300 \
     --lrepochs "200:10" \
-    --crop_width 500  \
+    --crop_width 512  \
     --crop_height 256 \
     --test_crop_width 1248  \
     --test_crop_height 768 \
@@ -40,7 +40,7 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/m
     --mode train \
     --summary_freq 50 \
     --test_summary_freq 500 \
-    --feat_map 128 \
+    --feat_map 32 \
     --brightness 0.5 \
     --contrast 0.5 \
     --kernel 3 \
