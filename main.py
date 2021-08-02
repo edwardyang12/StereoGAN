@@ -32,7 +32,7 @@ parser.add_argument('--maxdisp', type=int, default=192, help='maximum disparity'
 
 parser.add_argument('--dataset', required=True, help='dataset name', choices=__datasets__.keys())
 parser.add_argument('--datapath', required=True, help='data path')
-#parser.add_argument('--depthpath', required=True, help='depth path')
+parser.add_argument('--depthpath', required=True, help='depth path')
 parser.add_argument('--test_dataset', required=True, help='dataset name', choices=__datasets__.keys())
 parser.add_argument('--test_datapath', required=True, help='data path')
 parser.add_argument('--test_sim_datapath', required=True, help='data path')
@@ -84,6 +84,8 @@ parser.add_argument('--sync_bn', action='store_true',help='enabling apex sync BN
 parser.add_argument('--opt-level', type=str, default="O0")
 parser.add_argument('--keep-batchnorm-fp32', type=str, default=None)
 parser.add_argument('--loss-scale', type=str, default=None)
+
+parser.add_argument('--feat_map', type=int, default=None)
 
 parser.add_argument('--use_jitter', action='store_true', help='use color jitter.')
 parser.add_argument('--use_blur', action='store_true', help='use gaussian blur.')
@@ -141,12 +143,13 @@ model = __models__[args.model](
                             ndisps=[int(nd) for nd in args.ndisps.split(",") if nd],
                             disp_interval_pixel=[float(d_i) for d_i in args.disp_inter_r.split(",") if d_i],
                             cr_base_chs=[int(ch) for ch in args.cr_base_chs.split(",") if ch],
+                            feat_map=args.feat_map,
                             grad_method=args.grad_method,
                             using_ns=args.using_ns,
                             ns_size=args.ns_size
                            )
 
-discriminator = Discriminator().cuda()
+discriminator = Discriminator(3, args.feat_map).cuda()
 discriminator.apply(weights_init)
 
 real_label = 1.

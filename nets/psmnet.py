@@ -319,7 +319,7 @@ class GetCostVolume(nn.Module):
 
 
 class PSMNet(nn.Module):
-    def __init__(self, maxdisp, ndisps, disp_interval_pixel, using_ns, ns_size, grad_method="detach",
+    def __init__(self, maxdisp, ndisps, disp_interval_pixel, using_ns, ns_size, feat_map, grad_method="detach",
                  cr_base_chs=[32, 32, 32]):
         super(PSMNet, self).__init__()
         self.maxdisp = maxdisp
