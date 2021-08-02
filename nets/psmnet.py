@@ -387,8 +387,8 @@ class PSMNet(nn.Module):
 
         outputs = {}
 
-        outputs['left_g'] = left_d
-        outputs['right_g'] = right_d
+        outputs['left_g'] = left_g
+        outputs['right_g'] = right_g
 
 
         pred, cur_disp = None, None
