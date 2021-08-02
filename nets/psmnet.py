@@ -352,7 +352,7 @@ class PSMNet(nn.Module):
 
         self.get_cv = GetCostVolume()
 
-        self.generator = Generator(3, feat_map)
+        self.generator = Generator(1, feat_map)
         self.generator.apply(weights_init)
 
         cr_feats_in_chs = [chs * 2 for chs in self.feature_extraction.out_channels]

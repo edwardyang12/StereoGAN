@@ -149,7 +149,7 @@ model = __models__[args.model](
                             ns_size=args.ns_size
                            )
 
-discriminator = Discriminator(3, args.feat_map).cuda()
+discriminator = Discriminator(1, args.feat_map).cuda()
 discriminator.apply(weights_init)
 
 real_label = 1.
