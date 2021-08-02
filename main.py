@@ -357,14 +357,14 @@ def train_sample(sample, indx, compute_metrics=False):
 
     #disp_gt_b = disp_gt
     #print(disp_gt.shape)
-    disp_gt_t = disp_gt.reshape((2,1,256,512))
+    disp_gt_t = disp_gt.reshape((1,1,256,512))
     disparity_L_from_R = apply_disparity_cu(disp_gt_t, disp_gt_t.int())
     #disp_gt = disparity_L_from_R.reshape((1,2,256,512))
-    disp_gt = disparity_L_from_R.reshape((2,256,512))
+    disp_gt = disparity_L_from_R.reshape((1,256,512)).cuda()
 
-    disp_gt = cv2.medianBlur(disp_gt.cpu().numpy(),3)
+    #disp_gt = cv2.medianBlur(disp_gt.cpu().numpy(),3)
 
-    disp_gt = torch.from_numpy(disp_gt).cuda()
+    #disp_gt = torch.from_numpy(disp_gt).cuda()
     #print(disp_gt.shape)
     #disp_gt_a = disp_gt
     discriminator.zero_grad()
