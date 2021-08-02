@@ -408,7 +408,7 @@ def train_sample(sample, indx, compute_metrics=False):
     errD_fake.backward()
     D_G_z1 = output_dl.mean().item()
     # Compute error of D as sum over the fake and the real batches
-    #errD = errD_real + errD_fake
+    errD = errD_fake
     # Update D
     optimizerD.step()
 
@@ -428,7 +428,7 @@ def train_sample(sample, indx, compute_metrics=False):
     output_dr = discriminator(fake_r).view(-1)
 
     mask = (disp_gt < args.maxdisp) & (disp_gt > 0)
-    loss = model_loss(outputs, disp_gt, mask, criterion, output_dl, output_dr, label, dlossw=[float(e) for e in args.dlossw.split(",") if e])
+    loss, errG = model_loss(outputs, disp_gt, mask, criterion, output_dl, output_dr, label, dlossw=[float(e) for e in args.dlossw.split(",") if e])
 
     outputs_stage = outputs["stage{}".format(num_stage)]
     disp_ests = [outputs_stage["pred1"], outputs_stage["pred2"], outputs_stage["pred3"]]
@@ -446,6 +446,8 @@ def train_sample(sample, indx, compute_metrics=False):
             scalar_outputs["Thres1"] = [Thres_metric(disp_est, disp_gt, mask, 1.0) for disp_est in disp_ests]
             scalar_outputs["Thres2"] = [Thres_metric(disp_est, disp_gt, mask, 2.0) for disp_est in disp_ests]
             scalar_outputs["Thres3"] = [Thres_metric(disp_est, disp_gt, mask, 3.0) for disp_est in disp_ests]
+            scalar_outputs["Err_D"] = [errD.item()]
+            scalar_outputs["Err_G"] = [errG.item()]
             #text_outputs["before_warp"] = [str(disp_gt_b)]
             #text_outputs["after_warp"] = [str(disp_gt_a)]
 
