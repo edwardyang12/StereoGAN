@@ -9,7 +9,7 @@ if [ ! -d $save_path ];then
 fi
 
 
-python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/cs_train/CasStereoNet/main.py \
+python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/main.py \
     --dataset messy_table \
     --test_dataset messy_table \
     --datapath /cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training \
