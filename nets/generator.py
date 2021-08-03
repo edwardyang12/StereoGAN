@@ -5,7 +5,7 @@ class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels,stride=1, kernel_size=3):
         super().__init__()
         self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride),
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding =1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
         )
@@ -16,7 +16,7 @@ class ConvTranspose(nn.Module):
         def __init__(self, in_channels, out_channels,stride=2, kernel_size=4):
             super().__init__()
             self.double_conv = nn.Sequential(
-                nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride),
+                nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding =1),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(inplace=True),
             )
@@ -38,7 +38,7 @@ class Generator(nn.Module):
         self.up_sample_3 = ConvTranspose(128,64)
         self.up_3 = ConvBlock(128,64)
 
-        self.temp_4 = nn.Conv2d(64,1)
+        self.temp_4 = nn.Conv2d(64,1, kernel_size=3, padding =1)
 
 
     def forward(self,x):

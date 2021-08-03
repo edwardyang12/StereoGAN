@@ -139,7 +139,7 @@ for epoch in range(num_epochs):
         # Since we just updated D, perform another forward pass of all-fake batch through D
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
-        cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
+        cropped_fake = F.crop(fake, top, left, patch, patch)
 
         output = netD(cropped_fake).view(-1)
         # Calculate G's loss based on this output
@@ -163,10 +163,11 @@ for epoch in range(num_epochs):
                 fake = netG(simdata).detach().cpu().numpy()
             # img = vutils.make_grid(fake, padding=2, normalize=True)
 
-            img = fake[0][0]*255
+            img = ((fake[0][0]*0.5)+0.5)*255.
             img = Image.fromarray(img.astype(np.uint8),'L')
             img.save('fake'+str(epoch)+'_'+str(i)+'.png')
-            temp = (simdata[0][0]*255).detach().cpu().numpy()
+            temp = (simdata[0][0]).detach().cpu().numpy()
+            temp = ((temp*0.5)+0.5)*255.
             temp = Image.fromarray(temp.astype(np.uint8),'L')
             temp.save('orig'+str(epoch)+'_'+str(i)+'.png')
 
