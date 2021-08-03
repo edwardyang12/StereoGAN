@@ -43,6 +43,8 @@ def stereo_psmnet_loss(inputs, target, mask, criterion, out_l, out_r, label, **k
 
     errG_l = criterion(out_l, label)
     errG_r = criterion(out_r, label)
+    print("errGl: ", errG_l, " ", out_l, " ", label)
+    print("errGr: ", errG_r, " ", out_r, " ", label)
 
     total_loss = total_loss + errG_l + errG_r
     

@@ -40,7 +40,7 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/m
     --mode train \
     --summary_freq 50 \
     --test_summary_freq 500 \
-    --feat_map 32 \
+    --feat_map 8 \
     --brightness 0.5 \
     --contrast 0.5 \
     --kernel 3 \
