@@ -385,7 +385,7 @@ def train_sample(sample, indx, compute_metrics=False):
         #print(output.shape)
         # Calculate loss on all-real batch
         errD_real = criterion(output_d, label)
-        print("errD_real: ", errD_real, " ", output_d, " ", label)
+        #print("errD_real: ", errD_real, " ", output_d, " ", label)
         # Calculate gradients for D in backward pass
         errD_real.backward()
         D_x = output_d.mean().item()
@@ -405,7 +405,7 @@ def train_sample(sample, indx, compute_metrics=False):
     output_dl = discriminator(fake_l.detach()).view(-1)
     # Calculate D's loss on the all-fake batch
     errD_fake = criterion(output_dl, label)
-    print("errDl_fake: ", errD_fake, " ", output_dl, " ", label)
+    #print("errDl_fake: ", errD_fake, " ", output_dl, " ", label)
     # Calculate the gradients for this batch, accumulated (summed) with previous gradients
     errD_fake.backward()
     D_G_z1 = output_dl.mean().item()
@@ -419,7 +419,7 @@ def train_sample(sample, indx, compute_metrics=False):
     output_dr = discriminator(fake_r.detach()).view(-1)
     # Calculate D's loss on the all-fake batch
     errD_fake = criterion(output_dr, label)
-    print("errDr_fake: ", errD_fake, " ", output_dr, " ", label)
+    #print("errDr_fake: ", errD_fake, " ", output_dr, " ", label)
     # Calculate the gradients for this batch, accumulated (summed) with previous gradients
     errD_fake.backward()
     D_G_z1 += output_dr.mean().item()
@@ -431,6 +431,7 @@ def train_sample(sample, indx, compute_metrics=False):
     output_dr = discriminator(fake_r).view(-1)
 
     mask = (disp_gt < args.maxdisp) & (disp_gt > 0)
+    label.fill_(real_label)
     loss, errG = model_loss(outputs, disp_gt, mask, criterion, output_dl, output_dr, label, dlossw=[float(e) for e in args.dlossw.split(",") if e])
     
 
