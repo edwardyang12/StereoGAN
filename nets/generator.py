@@ -2,21 +2,21 @@ import torch.nn as nn
 import torch
 
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels,stride=2):
+    def __init__(self, in_channels, out_channels,stride=1, kernel_size=3):
         super().__init__()
         self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=4, padding=1, stride=stride),
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
         )
     def forward(self, x):
         return self.double_conv(x)
 
-class ConvTranpose(nn.Module):
-        def __init__(self, in_channels, out_channels,stride=2):
+class ConvTranspose(nn.Module):
+        def __init__(self, in_channels, out_channels,stride=2, kernel_size=4):
             super().__init__()
             self.double_conv = nn.Sequential(
-                nn.ConvTranpose2d(in_channels, out_channels, kernel_size=4, padding=1, stride=stride),
+                nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(inplace=True),
             )
@@ -27,28 +27,31 @@ class Generator(nn.Module):
     def __init__(self):
         super(Generator,self).__init__()
         self.input = ConvBlock(1,64)
+        self.sInput = ConvBlock(64,64, stride=2)
         self.down_1 = ConvBlock(64,128)
+        self.sDown_1 = ConvBlock(128,128, stride=2)
         self.down_2 = ConvBlock(128,256)
 
-        self.up_sample_2 = ConvTranpose(256,128)
-        self.up_2 = ConvBlock(256,128,stride=1)
+        self.up_sample_2 = ConvTranspose(256,128)
+        self.up_2 = ConvBlock(256,128)
 
-        self.up_sample_3 = ConvTranpose(128,64)
-        self.up_3 = ConvBlock(128,64,stride=1)
+        self.up_sample_3 = ConvTranspose(128,64)
+        self.up_3 = ConvBlock(128,64)
 
-        self.temp_4 = nn.Conv2d(64,1, kernel_size=3, padding=1 )
+        self.temp_4 = nn.Conv2d(64,1)
 
 
     def forward(self,x):
-        x2 = self.input(x)
-        x2 = self.down_1(x2)
-        x3 = self.down_2(x2)
+        x1 = self.input(x)
+        x2 = self.sInput(x1)
+        x3 = self.down_1(x2)
+        x4 = self.sDown_1(x3)
+        x5 = self.down_2(x4)
 
-        x5 = self.up_sample_2(x3)
+        x5 = self.up_sample_2(x5)
 
-        x5 = torch.cat((x2,x5),dim=1)
+        x5 = torch.cat((x3,x5),dim=1)
         x5 = self.up_2(x5)
-
         x6 = self.up_sample_3(x5)
 
         x6 = torch.cat((x1,x6),dim=1)
