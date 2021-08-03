@@ -100,7 +100,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_real = F.crop(real_cpu, top, left, patch, patch)
-        output = torch.mean(netD(cropped_real),dim=(2,3)).view(-1)
+        output = netD(cropped_real).view(-1)
         # Calculate loss on all-real batch
         errD_real = criterion(output, label)
         # Calculate gradients for D in backward pass
@@ -117,8 +117,10 @@ for epoch in range(num_epochs):
         label.fill_(fake_label)
 
         # Classify all fake batch with D
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
-        output = torch.mean(netD(cropped_fake),dim=(2,3)).view(-1)
+        output = netD(cropped_fake).view(-1)
         # Calculate D's loss on the all-fake batch
         errD_fake = criterion(output, label)
         # Calculate the gradients for this batch, accumulated (summed) with previous gradients
@@ -135,7 +137,11 @@ for epoch in range(num_epochs):
         netG.zero_grad()
         label.fill_(real_label)  # fake labels are real for generator cost
         # Since we just updated D, perform another forward pass of all-fake batch through D
-        output = torch.mean(netD(fake),dim=(2,3)).view(-1)
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
+
+        output = netD(cropped_fake).view(-1)
         # Calculate G's loss based on this output
         errG = criterion(output, label)
         # Calculate gradients for G
@@ -160,6 +166,9 @@ for epoch in range(num_epochs):
             img = fake[0][0]*255
             img = Image.fromarray(img.astype(np.uint8),'L')
             img.save('fake'+str(epoch)+'_'+str(i)+'.png')
+            temp = (simdata[0][0]*255).detach().cpu().numpy()
+            temp = Image.fromarray(temp.astype(np.uint8),'L')
+            temp.save('orig'+str(epoch)+'_'+str(i)+'.png')
 
         # Save Losses for plotting later
         G_losses.append(errG.item())
