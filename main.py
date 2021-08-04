@@ -462,6 +462,7 @@ def train_sample(sample, indx, compute_metrics=False):
             scaled_loss.backward()
     else:
         loss.backward()
+        errG.backward()
     optimizer.step()
 
     if is_distributed:
