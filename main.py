@@ -14,12 +14,13 @@ from nets.generator import Generator
 from datasets.custom_test import CustomDatasetTest
 
 lr = 0.0002
-num_epochs = 5
-batch_size = 4
+num_epochs = 10
+batch_size = 7
 beta1 = 0.5
 num_workers = 3
 ngpu = 4
-patch = 64 # patch size
+patch = 128 # patch size
+
 datapath = "./linked_real_v9"
 trainlist = "./filenames/custom_test_real.txt"
 
@@ -31,9 +32,9 @@ simset = CustomDatasetTest(simpath, simlist)
 
 
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                         shuffle=False, num_workers=num_workers)
+                                         shuffle=True, num_workers=num_workers)
 simloader = torch.utils.data.DataLoader(simset, batch_size=batch_size,
-                                         shuffle=False, num_workers=num_workers)
+                                         shuffle=True, num_workers=num_workers)
 
 
 device = torch.device("cuda" if (torch.cuda.is_available()) else "cpu")
@@ -57,9 +58,6 @@ if (device.type == 'cuda') and (ngpu > 1):
 netD.apply(weights_init)
 
 criterion = nn.BCELoss()
-
-# fixed_noise = torch.randn(128, 100, 13, 27, device=device)
-fixed_noise = torch.randn(128, 100, 1, 1, device=device)
 
 # Establish convention for real and fake labels during training
 real_label = 1.
@@ -108,9 +106,6 @@ for epoch in range(num_epochs):
         D_x = output.mean().item()
 
         ## Train with all-fake batch
-        # Generate batch of latent vectors
-        # noise = torch.randn(b_size, 100, 13, 27, device=device)
-        # noise = torch.randn(b_size, 100, 1, 1, device=device) # the size of the image (3,256,480)
 
         # Generate fake image batch with G
         fake = netG(simdata)
