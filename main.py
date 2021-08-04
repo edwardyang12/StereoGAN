@@ -368,6 +368,7 @@ def train_sample(sample, indx, compute_metrics=False):
     #print(disp_gt.shape)
     #disp_gt_a = disp_gt
     discriminator.zero_grad()
+    optimizerD.zero_grad()
     label = torch.full((1,), real_label, dtype=torch.float, device=imgL.device)
     transform = transforms.Compose([
         transforms.RandomCrop(64)
@@ -392,6 +393,7 @@ def train_sample(sample, indx, compute_metrics=False):
 
 
     optimizer.zero_grad()
+    
 
     outputs = model(imgL, imgR)
 
@@ -461,7 +463,7 @@ def train_sample(sample, indx, compute_metrics=False):
         with amp.scale_loss(loss, optimizer) as scaled_loss:
             scaled_loss.backward()
     else:
-        loss.backward()
+        loss.backward(retain_graph=True)
         errG.backward()
     optimizer.step()
 
