@@ -4,14 +4,14 @@ import torchvision.transforms as transforms
 
 
 def get_transform():
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
+    mean = [0.5]
+    std = [0.5]
 
     return transforms.Compose([
         # transforms.CenterCrop(540),
-        transforms.Resize(64),
+        transforms.Resize((512,512)),
         transforms.ToTensor(),
-        # transforms.Normalize(mean=mean, std=std),
+        transforms.Normalize(mean=mean, std=std),
     ])
 
 
