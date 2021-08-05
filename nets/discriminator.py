@@ -1,8 +1,8 @@
 import torch.nn as nn
 
-class Discriminator(nn.Module):
+class OrigDiscriminator(nn.Module):
     def __init__(self, channels=1, feat_map=64):
-        super(Discriminator, self).__init__()
+        super(OrigDiscriminator, self).__init__()
         self.main = nn.Sequential(
             # input is (channels) x 512 x 512
             # input is actually (chennels) x 64 x 64 patches

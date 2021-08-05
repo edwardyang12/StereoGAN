@@ -9,8 +9,8 @@ import time
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from nets.discriminator import Discriminator
-from nets.generator import Generator
+from nets.discriminator import SimpleDiscriminator as Discriminator
+from nets.generator import MiniUnet as Generator
 from datasets.custom_test import CustomDatasetTest
 
 lr = 0.0002
