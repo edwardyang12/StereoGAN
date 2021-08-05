@@ -463,8 +463,7 @@ def train_sample(sample, indx, compute_metrics=False):
         with amp.scale_loss(loss, optimizer) as scaled_loss:
             scaled_loss.backward()
     else:
-        loss.backward(retain_graph=True)
-        errG.backward()
+        loss.backward()
     optimizer.step()
 
     if is_distributed:
