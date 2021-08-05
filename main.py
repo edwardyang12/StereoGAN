@@ -97,6 +97,7 @@ parser.add_argument('--var', type=str, default=None)
 
 parser.add_argument('--simtosim', action='store_true', help='sim2sim training for gan.')
 
+parser.add_argument('--dcropsize', type=int, default=None)
 
 
 # parse arguments
@@ -371,7 +372,7 @@ def train_sample(sample, indx, compute_metrics=False):
     optimizerD.zero_grad()
     label = torch.full((1,), real_label, dtype=torch.float, device=imgL.device)
     transform = transforms.Compose([
-        transforms.RandomCrop(64)
+        transforms.RandomCrop(args.dcropsize)
     ])
 
     if args.simtosim:

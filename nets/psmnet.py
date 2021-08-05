@@ -378,7 +378,7 @@ class PSMNet(nn.Module):
 
     def forward(self, left, right):
         #print("left input: ", left.shape, left)
-
+        
         left_g = self.generator(left)
         right_g = self.generator(right)
 
