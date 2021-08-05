@@ -95,7 +95,7 @@ parser.add_argument('--contrast', type=str, default=None)
 parser.add_argument('--kernel', type=int, default=None)
 parser.add_argument('--var', type=str, default=None)
 
-
+parser.add_argument('--simtosim', action='store_true', help='sim2sim training for gan.')
 
 
 
@@ -373,11 +373,9 @@ def train_sample(sample, indx, compute_metrics=False):
     transform = transforms.Compose([
         transforms.RandomCrop(64)
     ])
-    if indx % ((len(TrainImgLoader) / len(RealImgLoader)) + 1) == 0:
-        real_data = next(iter(RealImgLoader))['left']
-        real_data = real_data.cuda()
-        real_data = transform(real_data)
 
+    if args.simtosim:
+        real_data = transform(imgL).cuda()
         b_size = real_data.size(0)
 
         label = torch.full((b_size,), real_label, dtype=torch.float, device=imgL.device)
@@ -390,6 +388,24 @@ def train_sample(sample, indx, compute_metrics=False):
         # Calculate gradients for D in backward pass
         errD_real.backward()
         D_x = output_d.mean().item()
+    else:
+        if indx % ((len(TrainImgLoader) / len(RealImgLoader)) + 1) == 0:
+            real_data = next(iter(RealImgLoader))['left']
+            real_data = real_data.cuda()
+            real_data = transform(real_data)
+
+            b_size = real_data.size(0)
+
+            label = torch.full((b_size,), real_label, dtype=torch.float, device=imgL.device)
+            # Forward pass real batch through D
+            output_d = discriminator(real_data).view(-1)
+            #print(output.shape)
+            # Calculate loss on all-real batch
+            errD_real = criterion(output_d, label)
+            #print("errD_real: ", errD_real, " ", output_d, " ", label)
+            # Calculate gradients for D in backward pass
+            errD_real.backward()
+            D_x = output_d.mean().item()
 
 
     optimizer.zero_grad()
