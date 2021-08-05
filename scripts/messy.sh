@@ -46,5 +46,5 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/m
     --kernel 3 \
     --var "0.1,2.0" \
     --simtosim \
-    --dcropsize 64 \
+    --dcropsize 128 \
     #--loadckpt "/cephfs/jianyu/train/cs_train/checkpoint_best.ckpt"
