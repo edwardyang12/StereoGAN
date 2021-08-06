@@ -78,7 +78,9 @@ for epoch in range(num_epochs):
     start = time.time()
     for data, simdata in zip(enumerate(dataloader), enumerate(simloader)):
         i, data = data
+        data, path = data
         j, simdata = simdata
+        simdata, simpath = simdata
 
         ############################
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -139,6 +141,7 @@ for epoch in range(num_epochs):
         output = netD(cropped_fake).view(-1)
         # Calculate G's loss based on this output
         errG = criterion(output, label)
+        temp = output
         # Calculate gradients for G
         errG.backward()
         D_G_z2 = output.mean().item()
@@ -153,14 +156,19 @@ for epoch in range(num_epochs):
             print(time.time()-start)
             start = time.time()
 
-        if (iters%200 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
+        if (iters%50 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
             with torch.no_grad():
                 fake = netG(simdata).detach().cpu().numpy()
-            # img = vutils.make_grid(fake, padding=2, normalize=True)
+            for x in range(len(temp)):
+                if(temp[x]<0.5):
+                    patches = ((cropped_fake[x][0].detach().cpu().numpy()*0.5)+0.5)*255.
+                    patches = Image.fromarray(patches.astype(np.uint8),'L')
+                    patches.save('patches/patch'+str(x) + '_' + str(epoch)+'_'+str(i)+'.png')
 
             img = ((fake[0][0]*0.5)+0.5)*255.
             img = Image.fromarray(img.astype(np.uint8),'L')
             img.save('fake'+str(epoch)+'_'+str(i)+'.png')
+            print(simpath[0])
             temp = (simdata[0][0]).detach().cpu().numpy()
             temp = ((temp*0.5)+0.5)*255.
             temp = Image.fromarray(temp.astype(np.uint8),'L')
@@ -172,6 +180,26 @@ for epoch in range(num_epochs):
 
         iters += 1
 
+def merge_two_dicts(x, y):
+    z = x.copy()   # start with x's keys and values
+    z.update(y)    # modifies z with y's keys and values & returns None
+    return z
+
+# distribution
+occur = dict()
+for simdata in enumerate(simloader):
+    j, simdata = simdata
+    simdata, simpath = simdata
+    simdata = simdata.to(device)
+    with torch.no_grad():
+        fake = netG(simdata).detach().cpu().numpy().flatten()
+        fake = ((fake*0.5)+0.5)*255.
+    unique, counts = np.unique(fake.astype(np.uint8), return_counts=True)
+    temp = dict(zip(unique, counts))
+    occur = merge_two_dicts(occur, temp)
+print(occur)
+
+# loss graph
 plt.figure(figsize=(10,5))
 plt.title("Generator and Discriminator Loss During Training")
 plt.plot(G_losses,label="G")

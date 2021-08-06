@@ -73,3 +73,20 @@ class SimpleGenerator(nn.Module):
 
     def forward(self,x):
         return self.main(x)
+
+class ResGenerator(nn.Module):
+    def __init__(self):
+        super(ResGenerator,self).__init__()
+
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding =1)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.conv2 = nn.Conv2d(64, 1, kernel_size=3, padding =1)
+
+    def forward(self,x):
+        shortcut = x
+        x = self.conv1(x)
+        x = nn.ReLU(inplace=True)(self.bn1(x))
+        x = self.conv2(x)
+        x = torch.add(shortcut,x)
+        x = nn.Tanh()(x)
+        return x

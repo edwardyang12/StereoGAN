@@ -38,4 +38,4 @@ class CustomDatasetTest(Dataset):
         # right_img = processed(right_img).numpy()
 
 
-        return left_img, self.left_filenames[index]
+        return left_img, os.path.join(self.datapath, self.left_filenames[index])
