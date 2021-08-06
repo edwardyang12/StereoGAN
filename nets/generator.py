@@ -1,6 +1,25 @@
 import torch.nn as nn
 import torch
 
+class Generator(nn.Module):
+    def __init__(self, channels=3, feat_map=128):
+        super(Generator, self).__init__()
+
+        self.main = nn.Sequential(
+            # input is Z, going into a convolution
+            nn.Conv2d(channels, feat_map, 3, 1, 1, bias=False),
+            nn.BatchNorm2d(feat_map),
+            nn.ReLU(True),
+
+            nn.Conv2d(feat_map, 1, 3, 1, 1, bias=False),
+            nn.Tanh()
+            # state size. (channels) x 64 x 64
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
+"""
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels,stride=1, kernel_size=3):
         super().__init__()
@@ -59,7 +78,7 @@ class Generator(nn.Module):
         x7 = nn.Tanh()(self.temp_4(x6))
 
         return x7
-
+"""
 
 """
 class Generator(nn.Module):
