@@ -33,7 +33,7 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/m
     --using_ns \
     --ns_size 3 \
     --model gwcnet-c \
-    --logdir "/cephfs/jianyu/eval/cs_eval_gan_32"  \
+    --logdir "/cephfs/jianyu/eval/cs_eval_gan_2l"  \
     --ndisps "48,24" \
     --disp_inter_r "4,1"  \
     --batch_size 1 \
