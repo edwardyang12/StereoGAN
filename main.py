@@ -368,8 +368,9 @@ def train_sample(sample, indx, compute_metrics=False):
     #disp_gt = torch.from_numpy(disp_gt).cuda()
     #print(disp_gt.shape)
     #disp_gt_a = disp_gt
-    discriminator.zero_grad()
+    #discriminator.zero_grad()
     optimizerD.zero_grad()
+    
     label = torch.full((1,), real_label, dtype=torch.float, device=imgL.device)
     transform = transforms.Compose([
         transforms.RandomCrop(args.dcropsize)
