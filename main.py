@@ -432,7 +432,7 @@ def train_sample(sample, indx, compute_metrics=False):
     # Compute error of D as sum over the fake and the real batches
     errD = errD_fake
     # Update D
-    optimizerD.step()
+    #optimizerD.step()
 
     label.fill_(fake_label)
     # Classify all fake batch with D
