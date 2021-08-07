@@ -9,7 +9,7 @@ import time
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from nets.discriminator import SimpleDiscriminator as Discriminator
+from nets.discriminator import OrigDiscriminator as Discriminator
 from nets.generator import MiniUnet as Generator
 from datasets.custom_test import CustomDatasetTest
 
@@ -184,6 +184,24 @@ def merge_two_dicts(x, y):
     z = x.copy()   # start with x's keys and values
     z.update(y)    # modifies z with y's keys and values & returns None
     return z
+
+print('evaluating')
+for simdata in enumerate(simloader):
+    j, simdata = simdata
+    simdata, simpath = simdata
+    simdata = simdata.to(device)
+    for i in range(batch_size):
+        if '1-300135-15' in simpath[i]:
+            with torch.no_grad():
+                fake = netG(simdata).detach().cpu().numpy()
+                fake = ((fake[i][0]*0.5)+0.5)*255.
+                fake = Image.fromarray(fake.astype(np.uint8),'L')
+                fake.save('fake.png')
+                print(simpath[i])
+                temp = (simdata[i][0]).detach().cpu().numpy()
+                temp = ((temp*0.5)+0.5)*255.
+                temp = Image.fromarray(temp.astype(np.uint8),'L')
+                temp.save('orig.png')
 
 # distribution
 occur = dict()
