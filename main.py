@@ -238,6 +238,7 @@ test_real_dataset = Test_real_StereoDataset(args.test_real_datapath, args.real_t
                              test_crop_height=args.test_crop_height, test_crop_width=args.test_crop_width,
                              left_img="1024_irL_real_1080.png", right_img="1024_irR_real_1080.png", args=args)
 
+real_sampler = torch.utils.data.RandomSampler(test_real_dataset)
 
 if is_distributed:
     train_sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=dist.get_world_size(),
@@ -257,7 +258,7 @@ else:
     TestImgLoader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size,
                                                 shuffle=False, num_workers=4, drop_last=False)
 
-    RealImgLoader = torch.utils.data.DataLoader(test_real_dataset, batch_size=args.test_batch_size,
+    RealImgLoader = torch.utils.data.DataLoader(test_real_dataset, batch_size=args.test_batch_size, sampler=real_sampler, 
                                                 shuffle=False, num_workers=4, drop_last=False)
 
 
@@ -391,23 +392,23 @@ def train_sample(sample, indx, compute_metrics=False):
         errD_real.backward()
         D_x = output_d.mean().item()
     else:
-        if indx % ((len(TrainImgLoader) / len(RealImgLoader)) + 1) == 0:
-            real_data = next(iter(RealImgLoader))['left']
-            real_data = real_data.cuda()
-            real_data = transform(real_data)
 
-            b_size = real_data.size(0)
+        real_data = next(iter(RealImgLoader))['left']
+        real_data = real_data.cuda()
+        real_data = transform(real_data)
 
-            label = torch.full((b_size,), real_label, dtype=torch.float, device=imgL.device)
-            # Forward pass real batch through D
-            output_d = discriminator(real_data).view(-1)
-            #print(output.shape)
-            # Calculate loss on all-real batch
-            errD_real = criterion(output_d, label)
-            #print("errD_real: ", errD_real, " ", output_d, " ", label)
-            # Calculate gradients for D in backward pass
-            errD_real.backward()
-            D_x = output_d.mean().item()
+        b_size = real_data.size(0)
+
+        label = torch.full((b_size,), real_label, dtype=torch.float, device=imgL.device)
+        # Forward pass real batch through D
+        output_d = discriminator(real_data).view(-1)
+        #print(output.shape)
+        # Calculate loss on all-real batch
+        errD_real = criterion(output_d, label)
+        #print("errD_real: ", errD_real, " ", output_d, " ", label)
+        # Calculate gradients for D in backward pass
+        errD_real.backward()
+        D_x = output_d.mean().item()
 
 
     optimizer.zero_grad()
