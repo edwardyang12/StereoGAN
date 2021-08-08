@@ -382,6 +382,8 @@ class PSMNet(nn.Module):
         left_g = self.generator(left)
         right_g = self.generator(right)
 
+        #print(torch.unique(left_g))
+
         #print("left g: ", left_g.shape, left_g)
 
 
