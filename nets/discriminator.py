@@ -14,7 +14,7 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             # state size. (feat_map*8) x 4 x 4
-            nn.Conv2d(feat_map * 2, 1, 4, 1, 0, bias=False),
+            nn.Conv2d(feat_map * 2, 1, 16, 1, 0, bias=False),
             nn.Sigmoid()
         )
 
