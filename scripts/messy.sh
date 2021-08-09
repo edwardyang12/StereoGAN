@@ -33,7 +33,7 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/m
     --using_ns \
     --ns_size 3 \
     --model gwcnet-c \
-    --logdir "/cephfs/jianyu/eval/cs_eval_gan_test"  \
+    --logdir "/cephfs/jianyu/eval/cs_eval_gan_test_2"  \
     --ndisps "48,24" \
     --disp_inter_r "4,1"  \
     --batch_size 1 \
@@ -45,6 +45,6 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/m
     --contrast 0.5 \
     --kernel 3 \
     --var "0.1,2.0" \
-    --dcropsize 32 \
+    --dcropsize 64 \
     --lr 0.0001 \
     #--loadckpt "/cephfs/jianyu/train/cs_train/checkpoint_best.ckpt"
