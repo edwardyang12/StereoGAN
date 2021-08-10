@@ -36,7 +36,7 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/m
     --logdir "/cephfs/jianyu/eval/cs_eval_gan_test_3"  \
     --ndisps "48,24" \
     --disp_inter_r "4,1"  \
-    --batch_size 1 \
+    --batch_size 2 \
     --mode train \
     --summary_freq 50 \
     --test_summary_freq 500 \

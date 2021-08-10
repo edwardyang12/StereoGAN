@@ -425,13 +425,13 @@ def train_sample(sample, indx, compute_metrics=False):
     # Classify all fake batch with D
     output_dl = discriminator(fake_l.detach()).view(-1)
     # Calculate D's loss on the all-fake batch
-    errD_fake = criterion(output_dl, label)
+    errD_fake_l = criterion(output_dl, label)
     #print("errDl_fake: ", errD_fake, " ", output_dl, " ", label)
     # Calculate the gradients for this batch, accumulated (summed) with previous gradients
-    errD_fake.backward()
-    D_G_z1 = output_dl.mean().item()
+    #errD_fake.backward()
+    #D_G_z1 = output_dl.mean().item()
     # Compute error of D as sum over the fake and the real batches
-    errD = errD_fake
+    #errD = errD_fake
     # Update D
     #optimizerD.step()
 
@@ -439,12 +439,15 @@ def train_sample(sample, indx, compute_metrics=False):
     # Classify all fake batch with D
     output_dr = discriminator(fake_r.detach()).view(-1)
     # Calculate D's loss on the all-fake batch
-    errD_fake = criterion(output_dr, label)
+    errD_fake_r = criterion(output_dr, label)
     #print("errDr_fake: ", errD_fake, " ", output_dr, " ", label)
     # Calculate the gradients for this batch, accumulated (summed) with previous gradients
-    errD_fake.backward()
-    D_G_z1 += output_dr.mean().item()
-    D_G_z1 = D_G_z1/2.
+    #errD_fake.backward()
+    errD = errD_fake_l + errD_fake_r
+    errD.backward()
+
+    #D_G_z1 += output_dr.mean().item()
+    #D_G_z1 = D_G_z1/2.
     optimizerD.step()
 
 

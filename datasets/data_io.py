@@ -6,8 +6,8 @@ import torchvision.transforms as transforms
 def get_transform_train(color_jitter, kernel, var, use_blur, use_jitter):
     #mean = [0.485, 0.456, 0.406]
     #std = [0.229, 0.224, 0.225]
-    mean = [0.485]
-    std = [0.229]
+    mean = [0.5]
+    std = [0.5]
     #print(color_jitter.brightness)
     _, b, c, _, _ = transforms.ColorJitter.get_params(color_jitter.brightness, color_jitter.contrast, color_jitter.saturation, color_jitter.hue)
     if use_blur and use_jitter:
@@ -38,8 +38,8 @@ def get_transform_train(color_jitter, kernel, var, use_blur, use_jitter):
 
 
 def get_transform_test():
-    mean = [0.485]
-    std = [0.229]
+    mean = [0.5]
+    std = [0.5]
 
     #mean = [0.485, 0.456, 0.406]
     #std = [0.229, 0.224, 0.225]
