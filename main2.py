@@ -118,7 +118,7 @@ for epoch in range(num_epochs):
         # Calculate gradients for D in backward pass
         errD_real_orig.backward()
 
-        errD_real_mini = criterion(outputMini, label))
+        errD_real_mini = criterion(outputMini, label)
         errD_real_mini.backward()
 
         D_x = (outputOrig.mean().item() + outputMini.mean().item())/2
@@ -133,14 +133,14 @@ for epoch in range(num_epochs):
         patch = 128
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
-        cropped_real = F.crop(real_cpu, top, left, patch, patch)
-        outputOrig = origD(cropped_real).view(-1)
+        cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
+        outputOrig = origD(cropped_fake).view(-1)
 
         patch = 16
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
-        cropped_real = F.crop(real_cpu, top, left, patch, patch)
-        outputMini = miniD(cropped_real).view(-1)
+        cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
+        outputMini = miniD(cropped_fake).view(-1)
 
 
         # Calculate D's loss on the all-fake batch
@@ -156,7 +156,8 @@ for epoch in range(num_epochs):
         # Compute error of D as sum over the fake and the real batches
         errD = (errD_real_orig+errD_real_mini)/2 + (errD_fake_orig + errD_fake_mini)/2
         # Update D
-        optimizerD.step()
+        optimizerDorig.step()
+        optimizerDmini.step()
 
         ############################
         # (2) Update G network: maximize log(D(G(z)))
