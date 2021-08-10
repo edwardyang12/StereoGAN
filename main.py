@@ -424,7 +424,7 @@ def train_sample(sample, indx, compute_metrics=False):
     label.fill_(fake_label)
     # Classify all fake batch with D
     output_dl = discriminator(fake_l.detach()).view(-1)
-    print(fake_l.shape)
+    print(output_dl.shape, label.shape)
     # Calculate D's loss on the all-fake batch
     errD_fake_l = criterion(output_dl, label)
     #print("errDl_fake: ", errD_fake, " ", output_dl, " ", label)
