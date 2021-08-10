@@ -83,7 +83,7 @@ class Generator(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, channels=3, feat_map=128):
+    def __init__(self, channels=1, feat_map=8):
         super(Generator, self).__init__()
 
         self.main = nn.Sequential(
