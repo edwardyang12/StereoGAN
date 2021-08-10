@@ -258,7 +258,7 @@ else:
     TestImgLoader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size,
                                                 shuffle=False, num_workers=4, drop_last=False)
 
-    RealImgLoader = torch.utils.data.DataLoader(test_real_dataset, batch_size=args.test_batch_size, sampler=real_sampler, 
+    RealImgLoader = torch.utils.data.DataLoader(test_real_dataset, batch_size=args.batch_size, sampler=real_sampler, 
                                                 shuffle=False, num_workers=4, drop_last=False)
 
 
@@ -424,7 +424,7 @@ def train_sample(sample, indx, compute_metrics=False):
     label.fill_(fake_label)
     # Classify all fake batch with D
     output_dl = discriminator(fake_l.detach()).view(-1)
-    print(output_dl.shape, label.shape)
+    #print(output_dl.shape, label.shape)
     # Calculate D's loss on the all-fake batch
     errD_fake_l = criterion(output_dl, label)
     #print("errDl_fake: ", errD_fake, " ", output_dl, " ", label)
