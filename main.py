@@ -445,7 +445,8 @@ def train_sample(sample, indx, compute_metrics=False):
     # Calculate the gradients for this batch, accumulated (summed) with previous gradients
     #errD_fake.backward()
     errD = errD_fake_l + errD_fake_r
-    errD.backward()
+    errD_fake_l.backward()
+    errD_fake_r.backward()
 
     #D_G_z1 += output_dr.mean().item()
     #D_G_z1 = D_G_z1/2.
