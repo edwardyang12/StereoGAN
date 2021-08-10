@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-
+"""
 class Generator(nn.Module):
     def __init__(self, channels=1, feat_map=16):
         super(Generator, self).__init__()
@@ -19,6 +19,7 @@ class Generator(nn.Module):
     def forward(self, input):
         return self.main(input)
 
+"""
 """
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels,stride=1, kernel_size=3):
@@ -80,7 +81,7 @@ class Generator(nn.Module):
         return x7
 """
 
-"""
+
 class Generator(nn.Module):
     def __init__(self, channels=3, feat_map=128):
         super(Generator, self).__init__()
@@ -123,4 +124,4 @@ class Generator(nn.Module):
 
     def forward(self, input):
         return self.main(input)
-"""
+
