@@ -9,8 +9,8 @@ import time
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from nets.discriminator import OrigDiscriminator as Discriminator
-from nets.generator import MiniUnet as Generator
+from nets.discriminator import OrigDiscriminator, MiniDiscriminator
+from nets.generator import ResGenerator as Generator
 from datasets.custom_test import CustomDatasetTest
 
 lr = 0.0002
@@ -52,10 +52,13 @@ netG = Generator().to(device)
 if (device.type == 'cuda') and (ngpu > 1):
     netG = nn.DataParallel(netG, list(range(ngpu)))
 
-netD = Discriminator().to(device)
+origD = OrigDiscriminator().to(device)
+miniD = MiniDiscriminator().to(device)
 if (device.type == 'cuda') and (ngpu > 1):
-    netD = nn.DataParallel(netD, list(range(ngpu)))
-netD.apply(weights_init)
+    origD = nn.DataParallel(origD, list(range(ngpu)))
+    miniD = nn.DataParallel(miniD, list(range(ngpu)))
+origD.apply(weights_init)
+miniD.apply(weights_init)
 
 criterion = nn.BCELoss()
 
@@ -64,7 +67,8 @@ real_label = 1.
 fake_label = 0.
 
 # Setup Adam optimizers for both G and D
-optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerDorig = optim.Adam(origD.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerDmini = optim.Adam(miniD.parameters(), lr=lr, betas=(beta1, 0.999))
 optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
 G_losses = []
@@ -86,7 +90,8 @@ for epoch in range(num_epochs):
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         ###########################
         ## Train with all-real batch
-        netD.zero_grad()
+        origD.zero_grad()
+        miniD.zero_grad()
 
         real_cpu = data.to(device)
         simdata = simdata.to(device)
@@ -96,16 +101,27 @@ for epoch in range(num_epochs):
         label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
 
         # Forward pass real batch through D
-
+        patch = 128
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_real = F.crop(real_cpu, top, left, patch, patch)
-        output = netD(cropped_real).view(-1)
+        outputOrig = origD(cropped_real).view(-1)
+
+        patch = 16
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_real = F.crop(real_cpu, top, left, patch, patch)
+        outputMini = miniD(cropped_real).view(-1)
+
         # Calculate loss on all-real batch
-        errD_real = criterion(output, label)
+        errD_real_orig = criterion(outputOrig, label)
         # Calculate gradients for D in backward pass
-        errD_real.backward()
-        D_x = output.mean().item()
+        errD_real_orig.backward()
+
+        errD_real_mini = criterion(outputMini, label)
+        errD_real_mini.backward()
+
+        D_x = (outputOrig.mean().item() + outputMini.mean().item())/2
 
         ## Train with all-fake batch
 
@@ -114,37 +130,62 @@ for epoch in range(num_epochs):
         label.fill_(fake_label)
 
         # Classify all fake batch with D
+        patch = 128
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
-        output = netD(cropped_fake).view(-1)
+        outputOrig = origD(cropped_fake).view(-1)
+
+        patch = 16
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
+        outputMini = miniD(cropped_fake).view(-1)
+
+
         # Calculate D's loss on the all-fake batch
-        errD_fake = criterion(output, label)
+        errD_fake_orig = criterion(outputOrig, label)
         # Calculate the gradients for this batch, accumulated (summed) with previous gradients
-        errD_fake.backward()
-        D_G_z1 = output.mean().item()
+        errD_fake_orig.backward()
+
+        errD_fake_mini = criterion(outputMini, label)
+        errD_fake_mini.backward()
+
+
+        D_G_z1 = outputOrig.mean().item() + outputMini.mean().item()
         # Compute error of D as sum over the fake and the real batches
-        errD = errD_real + errD_fake
+        errD = (errD_real_orig+errD_real_mini)/2 + (errD_fake_orig + errD_fake_mini)/2
         # Update D
-        optimizerD.step()
+        optimizerDorig.step()
+        optimizerDmini.step()
 
         ############################
         # (2) Update G network: maximize log(D(G(z)))
         ###########################
         netG.zero_grad()
         label.fill_(real_label)  # fake labels are real for generator cost
+
         # Since we just updated D, perform another forward pass of all-fake batch through D
+        patch = 128
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
-        cropped_fake = F.crop(fake, top, left, patch, patch)
+        cropped_fake_orig = F.crop(fake, top, left, patch, patch)
+        outputOrig = origD(cropped_fake_orig).view(-1)
 
-        output = netD(cropped_fake).view(-1)
+        patch = 16
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_fake_mini = F.crop(fake, top, left, patch, patch)
+        outputMini = miniD(cropped_fake_mini).view(-1)
+
         # Calculate G's loss based on this output
-        errG = criterion(output, label)
-        temp = output
+        errG = criterion(outputOrig, label) + criterion(outputMini, label)
+
+        temp = outputOrig
         # Calculate gradients for G
         errG.backward()
-        D_G_z2 = output.mean().item()
+
+        D_G_z2 = outputOrig.mean().item() + outputMini.mean().item()
         # Update G
         optimizerG.step()
 
@@ -161,7 +202,7 @@ for epoch in range(num_epochs):
                 fake = netG(simdata).detach().cpu().numpy()
             for x in range(len(temp)):
                 if(temp[x]<0.5):
-                    patches = ((cropped_fake[x][0].detach().cpu().numpy()*0.5)+0.5)*255.
+                    patches = ((cropped_fake_orig[x][0].detach().cpu().numpy()*0.5)+0.5)*255.
                     patches = Image.fromarray(patches.astype(np.uint8),'L')
                     patches.save('patches/patch'+str(x) + '_' + str(epoch)+'_'+str(i)+'.png')
 

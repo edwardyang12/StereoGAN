@@ -23,9 +23,9 @@ class ConvTranspose(nn.Module):
         def forward(self, x):
             return self.double_conv(x)
 
-class Generator(nn.Module):
+class MiniUnet(nn.Module):
     def __init__(self):
-        super(Generator,self).__init__()
+        super(MiniUnet,self).__init__()
         self.input = ConvBlock(1,64)
         self.sInput = ConvBlock(64,64, stride=2)
         self.down_1 = ConvBlock(64,128)
@@ -59,3 +59,34 @@ class Generator(nn.Module):
         x7 = nn.Tanh()(self.temp_4(x6))
 
         return x7
+
+class SimpleGenerator(nn.Module):
+    def __init__(self):
+        super(SimpleGenerator,self).__init__()
+        self.main = nn.Sequential(
+            nn.Conv2d(1, 64, kernel_size=3, padding =1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 1, kernel_size=3, padding =1),
+            nn.Tanh()
+        )
+
+    def forward(self,x):
+        return self.main(x)
+
+class ResGenerator(nn.Module):
+    def __init__(self):
+        super(ResGenerator,self).__init__()
+
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding =1)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.conv2 = nn.Conv2d(64, 1, kernel_size=3, padding =1)
+
+    def forward(self,x):
+        shortcut = x
+        x = self.conv1(x)
+        x = nn.ReLU(inplace=True)(self.bn1(x))
+        x = self.conv2(x)
+        x = torch.add(shortcut,x)
+        x = nn.Tanh()(x)
+        return x

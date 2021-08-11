@@ -9,16 +9,16 @@ import time
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from nets.discriminator import OrigDiscriminator as Discriminator
-from nets.generator import MiniUnet as Generator
+from nets.discriminator import OrigDiscriminator, MiniDiscriminator
+from nets.generator import ResGenerator as Generator
 from datasets.custom_test import CustomDatasetTest
 
 lr = 0.0002
-num_epochs = 10
+num_epochs = 15
 batch_size = 7
 beta1 = 0.5
-num_workers = 3
-ngpu = 4
+num_workers = 0
+ngpu = 1
 patch = 128 # patch size
 
 datapath = "./linked_real_v9"
@@ -52,10 +52,13 @@ netG = Generator().to(device)
 if (device.type == 'cuda') and (ngpu > 1):
     netG = nn.DataParallel(netG, list(range(ngpu)))
 
-netD = Discriminator().to(device)
+origD = OrigDiscriminator().to(device)
+miniD = MiniDiscriminator().to(device)
 if (device.type == 'cuda') and (ngpu > 1):
-    netD = nn.DataParallel(netD, list(range(ngpu)))
-netD.apply(weights_init)
+    origD = nn.DataParallel(origD, list(range(ngpu)))
+    miniD = nn.DataParallel(miniD, list(range(ngpu)))
+origD.apply(weights_init)
+miniD.apply(weights_init)
 
 criterion = nn.BCELoss()
 
@@ -64,11 +67,13 @@ real_label = 1.
 fake_label = 0.
 
 # Setup Adam optimizers for both G and D
-optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerDorig = optim.Adam(origD.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerDmini = optim.Adam(miniD.parameters(), lr=lr, betas=(beta1, 0.999))
 optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
 G_losses = []
-D_losses = []
+origD_losses = []
+miniD_losses = []
 iters = 0
 
 print("Starting Training Loop...")
@@ -82,11 +87,12 @@ for epoch in range(num_epochs):
         j, simdata = simdata
         simdata, simpath = simdata
 
+        patch = 128
         ############################
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         ###########################
         ## Train with all-real batch
-        netD.zero_grad()
+        origD.zero_grad()
 
         real_cpu = data.to(device)
         simdata = simdata.to(device)
@@ -100,7 +106,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_real = F.crop(real_cpu, top, left, patch, patch)
-        output = netD(cropped_real).view(-1)
+        output = origD(cropped_real).view(-1)
         # Calculate loss on all-real batch
         errD_real = criterion(output, label)
         # Calculate gradients for D in backward pass
@@ -117,16 +123,16 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
-        output = netD(cropped_fake).view(-1)
+        output = origD(cropped_fake).view(-1)
         # Calculate D's loss on the all-fake batch
         errD_fake = criterion(output, label)
         # Calculate the gradients for this batch, accumulated (summed) with previous gradients
         errD_fake.backward()
         D_G_z1 = output.mean().item()
         # Compute error of D as sum over the fake and the real batches
-        errD = errD_real + errD_fake
+        errDorig = errD_real + errD_fake
         # Update D
-        optimizerD.step()
+        optimizerDorig.step()
 
         ############################
         # (2) Update G network: maximize log(D(G(z)))
@@ -138,7 +144,72 @@ for epoch in range(num_epochs):
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake, top, left, patch, patch)
 
-        output = netD(cropped_fake).view(-1)
+        output = origD(cropped_fake).view(-1)
+        # Calculate G's loss based on this output
+        errG = criterion(output, label)
+        temp = output
+        # Calculate gradients for G
+        errG.backward()
+        D_G_z2 = output.mean().item()
+        # Update G
+        optimizerG.step()
+
+
+        ######################################## UPDATE MINI D ##########################
+        patch = 16
+        miniD.zero_grad()
+
+        real_cpu = data.to(device)
+        simdata = simdata.to(device)
+
+        b_size,channels,h,w = real_cpu.shape
+
+        label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
+
+        # Forward pass real batch through D
+
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_real = F.crop(real_cpu, top, left, patch, patch)
+        output = miniD(cropped_real).view(-1)
+        # Calculate loss on all-real batch
+        errD_real = criterion(output, label)
+        # Calculate gradients for D in backward pass
+        errD_real.backward()
+        D_x = output.mean().item()
+
+        ## Train with all-fake batch
+
+        # Generate fake image batch with G
+        fake = netG(simdata)
+        label.fill_(fake_label)
+
+        # Classify all fake batch with D
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_fake = F.crop(fake.detach(), top, left, patch, patch)
+        output = miniD(cropped_fake).view(-1)
+        # Calculate D's loss on the all-fake batch
+        errD_fake = criterion(output, label)
+        # Calculate the gradients for this batch, accumulated (summed) with previous gradients
+        errD_fake.backward()
+        D_G_z1 = output.mean().item()
+        # Compute error of D as sum over the fake and the real batches
+        errDmini = errD_real + errD_fake
+        # Update D
+        optimizerDmini.step()
+
+        ############################
+        # (2) Update G network: maximize log(D(G(z)))
+        ###########################
+        netG.zero_grad()
+        label.fill_(real_label)  # fake labels are real for generator cost
+        # Since we just updated D, perform another forward pass of all-fake batch through D
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_fake = F.crop(fake, top, left, patch, patch)
+
+        output = miniD(cropped_fake).view(-1)
         # Calculate G's loss based on this output
         errG = criterion(output, label)
         temp = output
@@ -152,7 +223,7 @@ for epoch in range(num_epochs):
         if i % 50 == 0:
             print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
                   % (epoch, num_epochs, i, len(dataloader),
-                     errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
+                     (errDmini.item()+errDorig.item())/2, errG.item(), D_x, D_G_z1, D_G_z2))
             print(time.time()-start)
             start = time.time()
 
@@ -176,7 +247,8 @@ for epoch in range(num_epochs):
 
         # Save Losses for plotting later
         G_losses.append(errG.item())
-        D_losses.append(errD.item())
+        origD_losses.append(errDorig.item())
+        miniD_losses.append(errDmini.item())
 
         iters += 1
 
@@ -185,7 +257,7 @@ def merge_two_dicts(x, y):
     z.update(y)    # modifies z with y's keys and values & returns None
     return z
 
-print('evaluating')
+print('Evaluating......')
 for simdata in enumerate(simloader):
     j, simdata = simdata
     simdata, simpath = simdata
@@ -221,7 +293,8 @@ print(occur)
 plt.figure(figsize=(10,5))
 plt.title("Generator and Discriminator Loss During Training")
 plt.plot(G_losses,label="G")
-plt.plot(D_losses,label="D")
+plt.plot(origD_losses,label="origD")
+plt.plot(miniD_losses,label="miniD")
 plt.xlabel("iterations")
 plt.ylabel("Loss")
 plt.legend()

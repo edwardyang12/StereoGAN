@@ -31,11 +31,11 @@ class CustomDatasetTest(Dataset):
 
     def __getitem__(self, index):
         left_img = self.load_image(os.path.join(self.datapath, self.left_filenames[index]))
-        right_img = self.load_image(os.path.join(self.datapath, self.right_filenames[index]))
+        # right_img = self.load_image(os.path.join(self.datapath, self.right_filenames[index]))
 
         processed = get_transform()
         left_img = processed(left_img).numpy()
-        right_img = processed(right_img).numpy()
+        # right_img = processed(right_img).numpy()
 
 
-        return left_img
+        return left_img, os.path.join(self.datapath, self.left_filenames[index])
