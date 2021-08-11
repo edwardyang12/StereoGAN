@@ -435,6 +435,7 @@ def train_sample(sample, indx, compute_metrics=False):
     #errD = errD_fake
     # Update D
     #optimizerD.step()
+    errD_fake_l.backward()
 
     label.fill_(fake_label)
     # Classify all fake batch with D
@@ -444,10 +445,8 @@ def train_sample(sample, indx, compute_metrics=False):
     #print("errDr_fake: ", errD_fake, " ", output_dr, " ", label)
     # Calculate the gradients for this batch, accumulated (summed) with previous gradients
     #errD_fake.backward()
-
-    errD_fake_l.backward()
     errD_fake_r.backward()
-    
+
     errD = errD_fake_l + errD_fake_r
     
 
