@@ -444,9 +444,12 @@ def train_sample(sample, indx, compute_metrics=False):
     #print("errDr_fake: ", errD_fake, " ", output_dr, " ", label)
     # Calculate the gradients for this batch, accumulated (summed) with previous gradients
     #errD_fake.backward()
-    errD = errD_fake_l + errD_fake_r
+
     errD_fake_l.backward()
     errD_fake_r.backward()
+    
+    errD = errD_fake_l + errD_fake_r
+    
 
     #D_G_z1 += output_dr.mean().item()
     #D_G_z1 = D_G_z1/2.
