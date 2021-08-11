@@ -10,7 +10,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 from nets.discriminator import OrigDiscriminator, MiniDiscriminator
-from nets.generator import MiniUnet as Generator
+from nets.generator import ResGenerator as Generator
 from datasets.custom_test import CustomDatasetTest
 
 lr = 0.0002
