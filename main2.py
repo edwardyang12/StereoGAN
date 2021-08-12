@@ -121,7 +121,7 @@ for epoch in range(num_epochs):
         errD_real_mini = criterion(outputMini, label)
         errD_real_mini.backward()
 
-        D_x = (outputOrig.mean().item() + outputMini.mean().item())/2
+        D_x = outputOrig.mean().item() + outputMini.mean().item())
 
         ## Train with all-fake batch
 
@@ -154,7 +154,7 @@ for epoch in range(num_epochs):
 
         D_G_z1 = outputOrig.mean().item() + outputMini.mean().item()
         # Compute error of D as sum over the fake and the real batches
-        errD = (errD_real_orig+errD_real_mini)/2 + (errD_fake_orig + errD_fake_mini)/2
+        errD = (errD_real_orig+errD_real_mini) + (errD_fake_orig + errD_fake_mini)
         # Update D
         optimizerDorig.step()
         optimizerDmini.step()

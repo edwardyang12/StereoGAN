@@ -14,7 +14,7 @@ from nets.generator import MiniUnet as Generator
 from datasets.custom_test import CustomDatasetTest
 
 lr = 0.0002
-num_epochs = 10
+num_epochs = 15
 batch_size = 7
 beta1 = 0.5
 num_workers = 3
@@ -202,6 +202,7 @@ for simdata in enumerate(simloader):
                 temp = ((temp*0.5)+0.5)*255.
                 temp = Image.fromarray(temp.astype(np.uint8),'L')
                 temp.save('orig.png')
+            break
 
 # distribution
 occur = dict()
