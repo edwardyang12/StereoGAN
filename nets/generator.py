@@ -3,7 +3,7 @@ import torch
 
 class Generator(nn.Module):
     def __init__(self):
-        super(ResGenerator,self).__init__()
+        super(Generator,self).__init__()
 
         self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding =1)
         self.bn1 = nn.BatchNorm2d(64)
