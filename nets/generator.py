@@ -1,5 +1,23 @@
 import torch.nn as nn
 import torch
+
+class Generator(nn.Module):
+    def __init__(self):
+        super(ResGenerator,self).__init__()
+
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding =1)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.conv2 = nn.Conv2d(64, 1, kernel_size=3, padding =1)
+
+    def forward(self,x):
+        shortcut = x
+        x = self.conv1(x)
+        x = nn.ReLU(inplace=True)(self.bn1(x))
+        x = self.conv2(x)
+        x = torch.add(shortcut,x)
+        x = nn.Tanh()(x)
+        return x
+
 """
 class Generator(nn.Module):
     def __init__(self, channels=1, feat_map=16):
@@ -21,6 +39,7 @@ class Generator(nn.Module):
 
 """
 
+"""
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels,stride=1, kernel_size=3):
         super().__init__()
@@ -79,7 +98,7 @@ class Generator(nn.Module):
         x7 = nn.Tanh()(self.temp_4(x6))
 
         return x7
-
+"""
 
 """
 class Generator(nn.Module):

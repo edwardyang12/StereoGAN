@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-"""
+
 class Discriminator(nn.Module):
     def __init__(self, channels=1, feat_map=64):
         super(Discriminator, self).__init__()
@@ -21,6 +21,8 @@ class Discriminator(nn.Module):
 
     def forward(self, input):
         return self.main(input)
+
+
 
 """
 class Discriminator(nn.Module):
@@ -50,4 +52,5 @@ class Discriminator(nn.Module):
 
     def forward(self, input):
         return self.main(input)
+    """
 
