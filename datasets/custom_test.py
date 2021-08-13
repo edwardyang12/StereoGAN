@@ -3,7 +3,7 @@ import random
 from torch.utils.data import Dataset
 from PIL import Image
 import numpy as np
-from datasets.data_io import get_transform, read_all_lines
+from datasets.data_io import get_transform_test, read_all_lines
 import pandas as pd
 from math import inf
 import cv2
@@ -33,7 +33,7 @@ class CustomDatasetTest(Dataset):
         left_img = self.load_image(os.path.join(self.datapath, self.left_filenames[index]))
         # right_img = self.load_image(os.path.join(self.datapath, self.right_filenames[index]))
 
-        processed = get_transform()
+        processed = get_transform_test()
         left_img = processed(left_img).numpy()
         # right_img = processed(right_img).numpy()
 

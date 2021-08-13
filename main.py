@@ -10,15 +10,16 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 from nets.discriminator import OrigDiscriminator as Discriminator
-from nets.generator import MiniUnet as Generator
+from nets.generator import ResGenerator as Generator
 from datasets.custom_test import CustomDatasetTest
+from datasets.custom_dataset import CustomDataset
 
 lr = 0.0002
 num_epochs = 15
 batch_size = 7
 beta1 = 0.5
-num_workers = 3
-ngpu = 4
+num_workers = 0
+ngpu = 1
 patch = 128 # patch size
 
 datapath = "./linked_real_v9"
@@ -27,14 +28,18 @@ trainlist = "./filenames/custom_test_real.txt"
 simpath = "./linked_sim_v9"
 simlist = "./filenames/custom_test_sim.txt"
 
-dataset = CustomDatasetTest(datapath, trainlist)
-simset = CustomDatasetTest(simpath, simlist)
+dataset = CustomDataset(datapath, trainlist)
+simset = CustomDataset(simpath, simlist)
+simtest = CustomDatasetTest(simpath, simlist)
 
 
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                          shuffle=True, num_workers=num_workers)
 simloader = torch.utils.data.DataLoader(simset, batch_size=batch_size,
                                          shuffle=True, num_workers=num_workers)
+simtest = torch.utils.data.DataLoader(simtest, batch_size=batch_size,
+                                         shuffle=True, num_workers=num_workers)
+
 
 
 device = torch.device("cuda" if (torch.cuda.is_available()) else "cpu")
@@ -186,7 +191,7 @@ def merge_two_dicts(x, y):
     return z
 
 print('evaluating')
-for simdata in enumerate(simloader):
+for simdata in enumerate(simtest):
     j, simdata = simdata
     simdata, simpath = simdata
     simdata = simdata.to(device)
@@ -206,7 +211,7 @@ for simdata in enumerate(simloader):
 
 # distribution
 occur = dict()
-for simdata in enumerate(simloader):
+for simdata in enumerate(simtest):
     j, simdata = simdata
     simdata, simpath = simdata
     simdata = simdata.to(device)
