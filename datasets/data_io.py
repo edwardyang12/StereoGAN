@@ -8,8 +8,17 @@ def get_transform():
     std = [0.5]
 
     return transforms.Compose([
-        # transforms.CenterCrop(540),
-        transforms.Resize((512,512)),
+
+        transforms.RandomCrop((512,512)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=mean, std=std),
+    ])
+
+def get_transform_test():
+    mean = [0.5]
+    std = [0.5]
+
+    return transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=mean, std=std),
     ])
