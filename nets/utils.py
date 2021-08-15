@@ -1,4 +1,7 @@
 import torch.nn as nn
+import torch
+from torch.autograd import Variable
+import random
 
 class ReplayBuffer():
     def __init__(self, max_size=50):
@@ -35,7 +38,7 @@ class LambdaLR():
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
-        nn.init.normal(m.weight.data, 0.0, 0.02)
+        nn.init.normal_(m.weight.data, 0.0, 0.02)
     elif classname.find('BatchNorm2d') != -1:
-        nn.init.normal(m.weight.data, 1.0, 0.02)
-        nn.init.constant(m.bias.data, 0.0)
+        nn.init.normal_(m.weight.data, 1.0, 0.02)
+        nn.init.constant_(m.bias.data, 0.0)

@@ -5,10 +5,11 @@ from torch.autograd import Variable
 from PIL import Image
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 
 from nets.discriminator import OrigDiscriminator as Discriminator
 from nets.generator import ResGenerator as Generator
-from utils import ReplayBuffer, weights_init
+from nets.utils import ReplayBuffer, weights_init
 from datasets.custom_test import CustomDatasetTest
 from datasets.custom_dataset import CustomDataset
 
@@ -19,6 +20,7 @@ beta1 = 0.5
 num_workers = 0
 ngpu = 1
 patch = 128 # patch size
+size = 512 # picture size
 
 datapath = "./linked_real_v9"
 trainlist = "./filenames/custom_test_real.txt"
@@ -116,14 +118,14 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake_B, top, left, patch, patch)
-        pred_fake = netD_B(cropped_fake)
+        pred_fake = netD_B(cropped_fake).view(-1)
         loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
 
         fake_A = netG_B2A(real_B)
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake_A, top, left, patch, patch)
-        pred_fake = netD_A(cropped_fake)
+        pred_fake = netD_A(cropped_fake).view(-1)
         loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
 
         # Cycle loss
@@ -147,7 +149,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_real = F.crop(real_A, top, left, patch, patch)
-        pred_real = netD_A(cropped_real)
+        pred_real = netD_A(cropped_real).view(-1)
         loss_D_real = criterion_GAN(pred_real, target_real)
 
         # Fake loss
@@ -155,7 +157,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake_A.detach(), top, left, patch, patch)
-        pred_fake = netD_A(cropped_fake)
+        pred_fake = netD_A(cropped_fake).view(-1)
         loss_D_fake = criterion_GAN(pred_fake, target_fake)
 
         # Total loss
@@ -172,7 +174,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_real = F.crop(real_B, top, left, patch, patch)
-        pred_real = netD_B(cropped_real)
+        pred_real = netD_B(cropped_real).view(-1)
         loss_D_real = criterion_GAN(pred_real, target_real)
 
         # Fake loss
@@ -180,7 +182,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake_B.detach(), top, left, patch, patch)
-        pred_fake = netD_B(cropped_fake)
+        pred_fake = netD_B(cropped_fake).view(-1)
         loss_D_fake = criterion_GAN(pred_fake, target_fake)
 
         # Total loss
@@ -191,16 +193,24 @@ for epoch in range(num_epochs):
 
 
         if i % 25 == 0:
-            print('loss_G: '+ str(loss_G) + ' loss_G_identity: ' + str(loss_identity_A + loss_identity_B) +  ' loss_G_GAN: ' + str(loss_GAN_A2B + loss_GAN_B2A))
-            print('loss_G_cycle: ' +  str(loss_cycle_ABA + loss_cycle_BAB) +  ' loss_D: ' + str(loss_D_A + loss_D_B))
+            print(i, len(dataloader), epoch)
+            print('loss_G: '+ str(loss_G.item()) + ' loss_G_identity: ' + str((loss_identity_A + loss_identity_B).item()) +  ' loss_G_GAN: ' + str((loss_GAN_A2B + loss_GAN_B2A).item()) + ' loss_G_cycle: ' +  str((loss_cycle_ABA + loss_cycle_BAB).item()))
+            print('loss_D: ' + str((loss_D_A + loss_D_B).item()))
             print(time.time()-start)
             start = time.time()
+
         if (iters%25 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
-            img = ((real_A[0][0]*0.5)+0.5)*255.
+            with torch.no_grad():
+                fake_B = netG_B2A(real_B).detach().cpu().numpy()
+                fake_A = netG_A2B(real_A).detach().cpu().numpy()
+
+            img = ((data[0][0]*0.5)+0.5)*255.
+            img = img.detach().cpu().numpy()
             img = Image.fromarray(img.astype(np.uint8),'L')
             img.save('real'+str(epoch)+'_'+str(i)+'.png')
 
-            img = ((real_B[0][0]*0.5)+0.5)*255.
+            img = ((simdata[0][0]*0.5)+0.5)*255.
+            img = img.detach().cpu().numpy()
             img = Image.fromarray(img.astype(np.uint8),'L')
             img.save('sim'+str(epoch)+'_'+str(i)+'.png')
 
@@ -216,6 +226,7 @@ for epoch in range(num_epochs):
 
         G_losses.append(loss_G.item())
         D_losses.append((loss_D_A + loss_D_B).item())
+        G_GAN_losses.append((loss_GAN_A2B + loss_GAN_B2A).item())
         iters += 1
 
 print('evaluating')
@@ -226,15 +237,16 @@ for simdata in enumerate(simtest):
     for i in range(batch_size):
         if '1-300135-15' in simpath[i]:
             with torch.no_grad():
-                fake = netG_B2A(simdata).detach().cpu().numpy()
-                fake = ((fake[i][0]*0.5)+0.5)*255.
-                fake = Image.fromarray(fake.astype(np.uint8),'L')
-                fake.save('fake.png')
-                print(simpath[i])
-                temp = (simdata[i][0]).detach().cpu().numpy()
-                temp = ((temp*0.5)+0.5)*255.
-                temp = Image.fromarray(temp.astype(np.uint8),'L')
-                temp.save('orig.png')
+                fake_B = netG_B2A(simdata).detach().cpu().numpy()
+
+            img = ((simdata[0][0]*0.5)+0.5)*255.
+            img = img.detach().cpu().numpy()
+            img = Image.fromarray(img.astype(np.uint8),'L')
+            img.save('sim.png')
+
+            img = ((fake_B[0][0]*0.5)+0.5)*255.
+            img = Image.fromarray(img.astype(np.uint8),'L')
+            img.save('fakeSim.png')
             break
 
 
@@ -242,6 +254,7 @@ for simdata in enumerate(simtest):
 plt.figure(figsize=(10,5))
 plt.title("Generator and Discriminator Loss During Training")
 plt.plot(G_losses,label="G")
+plt.plot(G_GAN_losses,label="G_GAN")
 plt.plot(D_losses,label="D")
 plt.xlabel("iterations")
 plt.ylabel("Loss")
