@@ -108,10 +108,19 @@ for epoch in range(num_epochs):
         # Identity loss
         # G_A2B(B) should equal B if real B is fed
         same_B = netG_A2B(real_B)
-        loss_identity_B = criterion_identity(same_B, real_B)*5.0
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_same_B = F.crop(same_B, top, left, patch, patch)
+        cropped_real_B = F.crop(real_B, top, left, patch, patch)
+        loss_identity_B = criterion_identity(cropped_same_B, cropped_real_B)*5.0
+
         # G_B2A(A) should equal A if real A is fed
         same_A = netG_B2A(real_A)
-        loss_identity_A = criterion_identity(same_A, real_A)*5.0
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_same_A = F.crop(same_A, top, left, patch, patch)
+        cropped_real_A = F.crop(real_A, top, left, patch, patch)
+        loss_identity_A = criterion_identity(cropped_same_A, cropped_real_A)*5.0
 
         # GAN loss
         fake_B = netG_A2B(real_A)
@@ -130,10 +139,18 @@ for epoch in range(num_epochs):
 
         # Cycle loss
         recovered_A = netG_B2A(fake_B)
-        loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*10.0
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_recovered_A = F.crop(recovered_A, top, left, patch, patch)
+        cropped_real_A = F.crop(real_A, top, left, patch, patch)
+        loss_cycle_ABA = criterion_cycle(cropped_recovered_A, cropped_real_A)*10.0
 
         recovered_B = netG_A2B(fake_A)
-        loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*10.0
+        top = np.random.randint(0,h-patch)
+        left = np.random.randint(0,w-patch)
+        cropped_recovered_B = F.crop(recovered_B, top, left, patch, patch)
+        cropped_real_B = F.crop(real_B, top, left, patch, patch)
+        loss_cycle_BAB = criterion_cycle(cropped_recovered_B, cropped_real_B)*10.0
 
         # Total loss
         loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
@@ -193,7 +210,7 @@ for epoch in range(num_epochs):
 
 
         if i % 25 == 0:
-            print(i, len(dataloader), epoch)
+            print("====== ", i, len(dataloader), epoch)
             print('loss_G: '+ str(loss_G.item()) + ' loss_G_identity: ' + str((loss_identity_A + loss_identity_B).item()) +  ' loss_G_GAN: ' + str((loss_GAN_A2B + loss_GAN_B2A).item()) + ' loss_G_cycle: ' +  str((loss_cycle_ABA + loss_cycle_BAB).item()))
             print('loss_D: ' + str((loss_D_A + loss_D_B).item()))
             print(time.time()-start)
