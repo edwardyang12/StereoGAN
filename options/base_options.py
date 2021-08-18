@@ -3,7 +3,7 @@ import os
 from utils import util
 import torch
 import nets as models
-import data
+#import data
 
 
 class BaseOptions():
