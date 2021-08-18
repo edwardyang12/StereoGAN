@@ -24,6 +24,7 @@ from nets.submodule import weights_init
 import torchvision.transforms as transforms
 from options.train_options import TrainOptions
 from nets.cycle_gan_model import *
+from nets import create_model
 
 cudnn.benchmark = True
 assert torch.backends.cudnn.enabled, "Amp requires cudnn backend to be enabled."
@@ -169,8 +170,11 @@ opt_s1.checkpoints_dir = args.logdir
 opt_s2.checkpoints_dir = args.logdir
 
 
-s1_gan = CycleGANModel(opt_s1)
-s2_gan = CycleGANModel(opt_s2)
+s1_gan  = create_model(opt_s1)      # create a model given opt.model and other options
+s1_gan.setup(opt_s1)
+
+s2_gan  = create_model(opt_s2)      # create a model given opt.model and other options
+s2_gan.setup(opt_s2)
 
 real_label = 1.
 fake_label = 0.
@@ -257,7 +261,7 @@ test_real_dataset = Test_real_StereoDataset(args.test_real_datapath, args.real_t
                              test_crop_height=args.test_crop_height, test_crop_width=args.test_crop_width,
                              left_img="1024_irL_real_1080.png", right_img="1024_irR_real_1080.png", args=args)
 
-#real_sampler = torch.utils.data.RandomSampler(test_real_dataset)
+real_sampler = torch.utils.data.RandomSampler(test_real_dataset)
 
 if is_distributed:
     train_sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=dist.get_world_size(),
@@ -272,12 +276,12 @@ if is_distributed:
 
 else:
     TrainImgLoader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                                 shuffle=True, num_workers=8, drop_last=True)
+                                                 shuffle=True, num_workers=4, drop_last=True)
 
     TestImgLoader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size,
                                                 shuffle=False, num_workers=4, drop_last=False)
 
-    RealImgLoader = torch.utils.data.DataLoader(test_real_dataset, batch_size=args.batch_size, 
+    RealImgLoader = torch.utils.data.DataLoader(test_real_dataset, batch_size=args.batch_size, sampler=real_sampler,
                                                 shuffle=False, num_workers=4, drop_last=False)
 
     SimImgLoader = torch.utils.data.DataLoader(test_sim_dataset, batch_size=args.batch_size, 
@@ -298,7 +302,7 @@ def train():
         s2_gan.update_learning_rate()
 
         # training
-        for batch_idx, simsample, _, realsample in zip(enumerate(SimImgLoader), enumerate(RealImgLoader)):
+        for batch_idx, simsample, _, realsample in zip(enumerate(TrainImgLoader), next(iter(RealImgLoader))):
             global_step = len(TrainImgLoader) * epoch_idx + batch_idx
             start_time = time.time()
             do_summary = global_step % args.summary_freq == 0
