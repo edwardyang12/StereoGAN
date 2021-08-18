@@ -69,7 +69,7 @@ class BaseOptions():
 
         # get the basic options
         opt, _ = parser.parse_known_args()
-
+        opt.model = "cycle_gan"
         # modify model-related parser options
         print(opt.model)
         model_name = opt.model
