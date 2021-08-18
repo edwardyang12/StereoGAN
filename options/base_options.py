@@ -71,6 +71,7 @@ class BaseOptions():
         opt, _ = parser.parse_known_args()
 
         # modify model-related parser options
+        print(opt.model)
         model_name = opt.model
         model_option_setter = models.get_option_setter(model_name)
         parser = model_option_setter(parser, self.isTrain)
