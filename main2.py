@@ -19,7 +19,8 @@ batch_size = 7
 beta1 = 0.5
 num_workers = 0
 ngpu = 1
-patch = 128 # patch size
+sample = 128  # size of sample for cycle and identity loss
+patch = 256 # patch size
 size = 512 # picture size
 
 datapath = "./linked_real_v9"
@@ -74,8 +75,8 @@ fake_label = 0.
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 input_A = Tensor(batch_size, 1, size, size)
 input_B = Tensor(batch_size, 1, size, size)
-target_real = Variable(Tensor(batch_size).fill_(real_label), requires_grad=False)
-target_fake = Variable(Tensor(batch_size).fill_(fake_label), requires_grad=False)
+target_real = torch.full((batch_size,1,30,30), real_label, dtype=torch.float, device=device) # 30 x 30 because crop size was 256 with PatchGAN
+target_fake = torch.full((batch_size,1,30,30), fake_label, dtype=torch.float, device=device) # should be 14 x 14 for patch 128
 
 fake_A_buffer = ReplayBuffer()
 fake_B_buffer = ReplayBuffer()
@@ -110,16 +111,16 @@ for epoch in range(num_epochs):
         same_B = netG_A2B(real_B)
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
-        cropped_same_B = F.crop(same_B, top, left, patch, patch)
-        cropped_real_B = F.crop(real_B, top, left, patch, patch)
+        cropped_same_B = F.crop(same_B, top, left, sample, sample)
+        cropped_real_B = F.crop(real_B, top, left, sample, sample)
         loss_identity_B = criterion_identity(cropped_same_B, cropped_real_B)*5.0
 
         # G_B2A(A) should equal A if real A is fed
         same_A = netG_B2A(real_A)
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
-        cropped_same_A = F.crop(same_A, top, left, patch, patch)
-        cropped_real_A = F.crop(real_A, top, left, patch, patch)
+        cropped_same_A = F.crop(same_A, top, left, sample, sample)
+        cropped_real_A = F.crop(real_A, top, left, sample, sample)
         loss_identity_A = criterion_identity(cropped_same_A, cropped_real_A)*5.0
 
         # GAN loss
@@ -141,15 +142,15 @@ for epoch in range(num_epochs):
         recovered_A = netG_B2A(fake_B)
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
-        cropped_recovered_A = F.crop(recovered_A, top, left, patch, patch)
-        cropped_real_A = F.crop(real_A, top, left, patch, patch)
+        cropped_recovered_A = F.crop(recovered_A, top, left, sample, sample)
+        cropped_real_A = F.crop(real_A, top, left, sample, sample)
         loss_cycle_ABA = criterion_cycle(cropped_recovered_A, cropped_real_A)*10.0
 
         recovered_B = netG_A2B(fake_A)
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
-        cropped_recovered_B = F.crop(recovered_B, top, left, patch, patch)
-        cropped_real_B = F.crop(real_B, top, left, patch, patch)
+        cropped_recovered_B = F.crop(recovered_B, top, left, sample, sample)
+        cropped_real_B = F.crop(real_B, top, left, sample, sample)
         loss_cycle_BAB = criterion_cycle(cropped_recovered_B, cropped_real_B)*10.0
 
         # Total loss
@@ -218,15 +219,15 @@ for epoch in range(num_epochs):
 
         if (iters%25 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
             with torch.no_grad():
-                fake_B = netG_B2A(real_B).detach().cpu().numpy()
-                fake_A = netG_A2B(real_A).detach().cpu().numpy()
+                fake_A = netG_B2A(real_B).detach().cpu().numpy()
+                fake_B = netG_A2B(real_A).detach().cpu().numpy()
 
-            img = ((data[0][0]*0.5)+0.5)*255.
+            img = ((real_A[0][0]*0.5)+0.5)*255.
             img = img.detach().cpu().numpy()
             img = Image.fromarray(img.astype(np.uint8),'L')
             img.save('real'+str(epoch)+'_'+str(i)+'.png')
 
-            img = ((simdata[0][0]*0.5)+0.5)*255.
+            img = ((real_B[0][0]*0.5)+0.5)*255.
             img = img.detach().cpu().numpy()
             img = Image.fromarray(img.astype(np.uint8),'L')
             img.save('sim'+str(epoch)+'_'+str(i)+'.png')
@@ -254,16 +255,16 @@ for simdata in enumerate(simtest):
     for i in range(batch_size):
         if '1-300135-15' in simpath[i]:
             with torch.no_grad():
-                fake_B = netG_B2A(simdata).detach().cpu().numpy()
+                fake_A = netG_B2A(simdata).detach().cpu().numpy()
 
-            img = ((simdata[0][0]*0.5)+0.5)*255.
+            img = ((simdata[i][0]*0.5)+0.5)*255.
             img = img.detach().cpu().numpy()
             img = Image.fromarray(img.astype(np.uint8),'L')
             img.save('sim.png')
 
-            img = ((fake_B[0][0]*0.5)+0.5)*255.
+            img = ((fake_A[i][0]*0.5)+0.5)*255.
             img = Image.fromarray(img.astype(np.uint8),'L')
-            img.save('fakeSim.png')
+            img.save('fakeReal.png')
             break
 
 
@@ -276,4 +277,5 @@ plt.plot(D_losses,label="D")
 plt.xlabel("iterations")
 plt.ylabel("Loss")
 plt.legend()
+plt.ylim(0,30)
 plt.savefig('lossgraph.png')
