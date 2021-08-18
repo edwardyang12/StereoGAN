@@ -23,6 +23,7 @@ import cv2
 from nets.submodule import weights_init
 import torchvision.transforms as transforms
 from options.train_options import TrainOptions
+from nets.cycle_gan_model import *
 
 cudnn.benchmark = True
 assert torch.backends.cudnn.enabled, "Amp requires cudnn backend to be enabled."
