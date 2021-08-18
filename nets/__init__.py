@@ -27,6 +27,7 @@ def find_model_using_name(model_name):
     and it is case-insensitive.
     """
     model_filename = "nets." + model_name + "_model"
+    print(model_filename)
     modellib = importlib.import_module(model_filename)
     model = None
     target_model_name = model_name.replace('_', '') + 'model'
