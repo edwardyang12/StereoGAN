@@ -352,8 +352,11 @@ class PSMNet(nn.Module):
 
         self.get_cv = GetCostVolume()
 
-        self.generator = Generator()
-        self.generator.apply(weights_init)
+        #self.generator = Generator()
+        #self.generator.apply(weights_init)
+        self.cyclegan = CycleGANModel()
+
+        self.traingan = False
 
         cr_feats_in_chs = [chs * 2 for chs in self.feature_extraction.out_channels]
         self.cost_agg = nn.ModuleList([CostAggregation(in_channels=cr_feats_in_chs[i], base_channels=cr_base_chs[i])
@@ -375,25 +378,31 @@ class PSMNet(nn.Module):
             elif isinstance(m, nn.Linear):
                 m.bias.data.zero_()
 
+    def set_gan_train():
+        self.traingan = not self.traingan
+
 
     def forward(self, left, right):
         #print("left input: ", left.shape, left)
         
-        left_g = self.generator(left)
-        right_g = self.generator(right)
+        #left_g = self.generator(left)
+        #right_g = self.generator(right)
 
         #print(torch.unique(left_g))
 
         #print("left g: ", left_g.shape, left_g)
 
 
-        refimg_msfea = self.feature_extraction(left_g)
-        targetimg_msfea = self.feature_extraction(right_g)
+        refimg_msfea = self.feature_extraction(left)
+        targetimg_msfea = self.feature_extraction(right)
+
+        if self.traingan:
+            return refimg_msfea, targetimg_msfea
 
         outputs = {}
 
-        outputs['left_g'] = left_g
-        outputs['right_g'] = right_g
+        #outputs['left_g'] = left_g
+        #outputs['right_g'] = right_g
 
 
         pred, cur_disp = None, None
