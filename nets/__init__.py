@@ -27,7 +27,7 @@ def find_model_using_name(model_name):
     and it is case-insensitive.
     """
     model_filename = "nets." + model_name + "_model"
-    print(model_filename)
+    #print(model_filename)
     modellib = importlib.import_module(model_filename)
     model = None
     target_model_name = model_name.replace('_', '') + 'model'
@@ -60,6 +60,7 @@ def create_model(opt):
         >>> model = create_model(opt)
     """
     opt.model = "cycle_gan"
+    print(opt.model)
     model = find_model_using_name(opt.model)
     instance = model(opt)
     print("model [%s] was created" % type(instance).__name__)
