@@ -354,7 +354,7 @@ class PSMNet(nn.Module):
 
         #self.generator = Generator()
         #self.generator.apply(weights_init)
-        self.cyclegan = CycleGANModel()
+        #self.cyclegan = CycleGANModel()
 
         self.traingan = False
 
