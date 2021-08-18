@@ -169,6 +169,8 @@ opt_s2.output_nc = 16
 opt_s1.checkpoints_dir = args.logdir
 opt_s2.checkpoints_dir = args.logdir
 
+print(opt_s1.model, opt_s2.model)
+
 
 s1_gan  = create_model(opt_s1)      # create a model given opt.model and other options
 s1_gan.setup(opt_s1)

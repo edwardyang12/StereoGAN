@@ -59,8 +59,8 @@ def create_model(opt):
         >>> from models import create_model
         >>> model = create_model(opt)
     """
-    opt.model = "cycle_gan"
-    print(opt.model)
+    #opt.model = "cycle_gan"
+    
     model = find_model_using_name(opt.model)
     instance = model(opt)
     print("model [%s] was created" % type(instance).__name__)
