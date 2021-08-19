@@ -378,7 +378,7 @@ class PSMNet(nn.Module):
             elif isinstance(m, nn.Linear):
                 m.bias.data.zero_()
 
-    def set_gan_train():
+    def set_gan_train(self):
         self.traingan = not self.traingan
 
 
