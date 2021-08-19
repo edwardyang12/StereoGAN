@@ -306,7 +306,8 @@ def train():
         s2_gan.update_learning_rate()
 
         # training
-        for (batch_idx, simsample), realsample in zip(enumerate(TrainImgLoader), next(iter(RealImgLoader))):
+        for batch_idx, simsample in enumerate(TrainImgLoader):
+            realsample = next(iter(RealImgLoader))
             global_step = len(TrainImgLoader) * epoch_idx + batch_idx
             start_time = time.time()
             do_summary = global_step % args.summary_freq == 0
