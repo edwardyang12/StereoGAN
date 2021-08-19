@@ -7,15 +7,15 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-from nets.discriminator import OrigDiscriminator as Discriminator
-from nets.generator import ResGenerator as Generator
+from nets.discriminator import PatchGAN as Discriminator
+from nets.generator import MiniUnet as Generator
 from nets.utils import ReplayBuffer, weights_init
 from datasets.custom_test import CustomDatasetTest
 from datasets.custom_dataset import CustomDataset
 
 lr = 0.0002
-num_epochs = 15
-batch_size = 7
+num_epochs = 25
+batch_size = 1
 beta1 = 0.5
 num_workers = 0
 ngpu = 1
@@ -128,14 +128,14 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake_B, top, left, patch, patch)
-        pred_fake = netD_B(cropped_fake).view(-1)
+        pred_fake = netD_B(cropped_fake)
         loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
 
         fake_A = netG_B2A(real_B)
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake_A, top, left, patch, patch)
-        pred_fake = netD_A(cropped_fake).view(-1)
+        pred_fake = netD_A(cropped_fake)
         loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
 
         # Cycle loss
@@ -167,7 +167,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_real = F.crop(real_A, top, left, patch, patch)
-        pred_real = netD_A(cropped_real).view(-1)
+        pred_real = netD_A(cropped_real)
         loss_D_real = criterion_GAN(pred_real, target_real)
 
         # Fake loss
@@ -175,7 +175,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake_A.detach(), top, left, patch, patch)
-        pred_fake = netD_A(cropped_fake).view(-1)
+        pred_fake = netD_A(cropped_fake)
         loss_D_fake = criterion_GAN(pred_fake, target_fake)
 
         # Total loss
@@ -192,7 +192,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_real = F.crop(real_B, top, left, patch, patch)
-        pred_real = netD_B(cropped_real).view(-1)
+        pred_real = netD_B(cropped_real)
         loss_D_real = criterion_GAN(pred_real, target_real)
 
         # Fake loss
@@ -200,7 +200,7 @@ for epoch in range(num_epochs):
         top = np.random.randint(0,h-patch)
         left = np.random.randint(0,w-patch)
         cropped_fake = F.crop(fake_B.detach(), top, left, patch, patch)
-        pred_fake = netD_B(cropped_fake).view(-1)
+        pred_fake = netD_B(cropped_fake)
         loss_D_fake = criterion_GAN(pred_fake, target_fake)
 
         # Total loss
@@ -210,14 +210,14 @@ for epoch in range(num_epochs):
         optimizer_D_B.step()
 
 
-        if i % 25 == 0:
+        if i % 225 == 0:
             print("====== ", i, len(dataloader), epoch)
             print('loss_G: '+ str(loss_G.item()) + ' loss_G_identity: ' + str((loss_identity_A + loss_identity_B).item()) +  ' loss_G_GAN: ' + str((loss_GAN_A2B + loss_GAN_B2A).item()) + ' loss_G_cycle: ' +  str((loss_cycle_ABA + loss_cycle_BAB).item()))
             print('loss_D: ' + str((loss_D_A + loss_D_B).item()))
             print(time.time()-start)
             start = time.time()
 
-        if (iters%25 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
+        if (iters%225 ==0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
             with torch.no_grad():
                 fake_A = netG_B2A(real_B).detach().cpu().numpy()
                 fake_B = netG_A2B(real_A).detach().cpu().numpy()
@@ -277,5 +277,5 @@ plt.plot(D_losses,label="D")
 plt.xlabel("iterations")
 plt.ylabel("Loss")
 plt.legend()
-plt.ylim(0,30)
+plt.ylim(0,20)
 plt.savefig('lossgraph.png')
