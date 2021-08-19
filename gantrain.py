@@ -215,6 +215,8 @@ elif args.loadckpt:
     model.load_state_dict(state_dict['model'])
 print("start at epoch {}".format(start_epoch))
 
+model.set_gan_train()
+
 if args.using_apex:
     # Initialize Amp
     model, optimizer = amp.initialize(model, optimizer,
@@ -296,7 +298,7 @@ num_stage = len([int(nd) for nd in args.ndisps.split(",") if nd])
 def train():
     avg_test_scalars = None
     Cur_D1 = 1
-    model.set_gan_train()
+    #model.set_gan_train()
     model.eval()
     for epoch_idx in range(start_epoch, args.epochs):
         #adjust_learning_rate(optimizer, epoch_idx, args.lr, args.lrepochs)
