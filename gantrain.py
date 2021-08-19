@@ -215,7 +215,7 @@ elif args.loadckpt:
     model.load_state_dict(state_dict['model'])
 print("start at epoch {}".format(start_epoch))
 
-model.set_gan_train()
+model = model.feature_extraction
 
 if args.using_apex:
     # Initialize Amp
@@ -313,8 +313,8 @@ def train():
             start_time = time.time()
             do_summary = global_step % args.summary_freq == 0
             #loss, scalar_outputs, image_outputs = train_sample(sample, batch_idx, compute_metrics=do_summary)
-            simfeaL, simfeaR = model(simsample['left'].cuda(), simsample['right'].cuda())
-            realfeaL, realfeaR = model(realsample['left'].cuda(), realsample['right'].cuda())
+            simfeaL = model(simsample['left'].cuda())
+            realfeaL = model(realsample['left'].cuda())
 
             s1_gan.set_input(realfeaL['stage1'].detach(), simfeaL['stage1'].detach())         # unpack data from dataset and apply preprocessing
             s1_gan.optimize_parameters()
