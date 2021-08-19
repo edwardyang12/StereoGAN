@@ -215,7 +215,7 @@ elif args.loadckpt:
     model.load_state_dict(state_dict['model'])
 print("start at epoch {}".format(start_epoch))
 
-print(state_dict.keys())
+print(state_dict['model'].keys())
 model = model.feature_extraction
 model.load_state_dict(state_dict['model.feature_extraction'])
 
