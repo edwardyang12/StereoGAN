@@ -52,7 +52,7 @@ class MESSYDataset(Dataset):
 
 
     def load_image(self, filename, half):
-        img = Image.open(filename).convert('L')
+        img = Image.open(filename).convert('rgb')
         if half:
             img = img.resize((int(img.size[0]/2),int(img.size[1]/2)))
         return img

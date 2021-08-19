@@ -56,7 +56,7 @@ class feature_extraction(nn.Module):
         self.arch_mode = arch_mode
         self.num_stage = num_stage
         #TODO: split modifiy
-        self.firstconv_a = nn.Sequential(convbn(1, 32, 3, 1, 1, 1),
+        self.firstconv_a = nn.Sequential(convbn(3, 32, 3, 1, 1, 1),
                                        nn.ReLU(inplace=True),
                                        convbn(32, 32, 3, 1, 1, 1),
                                        nn.ReLU(inplace=True))
