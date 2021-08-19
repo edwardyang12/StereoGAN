@@ -30,7 +30,7 @@ cudnn.benchmark = True
 assert torch.backends.cudnn.enabled, "Amp requires cudnn backend to be enabled."
 
 parser = argparse.ArgumentParser(description='Cascade Stereo Network (CasStereoNet)')
-parser.add_argument('--model', default='gwcnet-c', help='select a model structure', choices=__models__.keys())
+parser.add_argument('--cmodel', default='gwcnet-c', help='select a model structure', choices=__models__.keys())
 parser.add_argument('--maxdisp', type=int, default=192, help='maximum disparity')
 
 parser.add_argument('--dataset', required=True, help='dataset name', choices=__datasets__.keys())
@@ -45,8 +45,8 @@ parser.add_argument('--testlist', required=True, help='testing list')
 parser.add_argument('--sim_testlist', required=True, help='testing list')
 parser.add_argument('--real_testlist', required=True, help='testing list')
 
-parser.add_argument('--lr', type=float, default=0.001, help='base learning rate')
-parser.add_argument('--batch_size', type=int, default=1, help='training batch size')
+parser.add_argument('--clr', type=float, default=0.001, help='base learning rate')
+parser.add_argument('--cbatch_size', type=int, default=1, help='training batch size')
 parser.add_argument('--test_batch_size', type=int, default=1, help='testing batch size')
 parser.add_argument('--epochs', type=int, required=True, help='number of epochs to train')
 parser.add_argument('--lrepochs', type=str, required=True, help='the epochs to decay lr: the downscale rate')
@@ -143,7 +143,7 @@ if (not is_distributed) or (dist.get_rank() == 0):
     logger = SummaryWriter(args.logdir)
 
 # model
-model = __models__[args.model](
+model = __models__[args.cmodel](
                             maxdisp=args.maxdisp,
                             ndisps=[int(nd) for nd in args.ndisps.split(",") if nd],
                             disp_interval_pixel=[float(d_i) for d_i in args.disp_inter_r.split(",") if d_i],
@@ -187,13 +187,13 @@ if args.sync_bn:
     model = apex.parallel.convert_syncbn_model(model)
 
 criterion = nn.BCELoss()
-model_loss = __loss__[args.model]
+model_loss = __loss__[args.cmodel]
 model.cuda()
 print('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
 
 #optimizer
-optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
-optimizerD = optim.Adam(discriminator.parameters(), lr=args.lr, betas=(0.5, 0.999))
+optimizer = optim.Adam(model.parameters(), lr=args.clr, betas=(0.9, 0.999))
+optimizerD = optim.Adam(discriminator.parameters(), lr=args.clr, betas=(0.5, 0.999))
 
 # load parameters
 start_epoch = 0
@@ -271,22 +271,22 @@ if is_distributed:
     test_sampler = torch.utils.data.DistributedSampler(test_dataset, num_replicas=dist.get_world_size(),
                                                        rank=dist.get_rank())
 
-    TrainImgLoader = torch.utils.data.DataLoader(train_dataset, args.batch_size, sampler=train_sampler, num_workers=1,
+    TrainImgLoader = torch.utils.data.DataLoader(train_dataset, args.cbatch_size, sampler=train_sampler, num_workers=1,
                                                  drop_last=True, pin_memory=True)
     TestImgLoader = torch.utils.data.DataLoader(test_dataset, args.test_batch_size, sampler=test_sampler, num_workers=1,
                                                 drop_last=False, pin_memory=True)
 
 else:
-    TrainImgLoader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
+    TrainImgLoader = torch.utils.data.DataLoader(train_dataset, batch_size=args.cbatch_size,
                                                  shuffle=True, num_workers=4, drop_last=True)
 
     TestImgLoader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size,
                                                 shuffle=False, num_workers=4, drop_last=False)
 
-    RealImgLoader = torch.utils.data.DataLoader(test_real_dataset, batch_size=args.batch_size, sampler=real_sampler,
+    RealImgLoader = torch.utils.data.DataLoader(test_real_dataset, batch_size=args.cbatch_size, sampler=real_sampler,
                                                 shuffle=False, num_workers=4, drop_last=False)
 
-    SimImgLoader = torch.utils.data.DataLoader(test_sim_dataset, batch_size=args.batch_size, 
+    SimImgLoader = torch.utils.data.DataLoader(test_sim_dataset, batch_size=args.cbatch_size, 
                                                 shuffle=False, num_workers=4, drop_last=False)
 
 

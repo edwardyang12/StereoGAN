@@ -54,6 +54,80 @@ class BaseOptions():
         parser.add_argument('--load_iter', type=int, default='0', help='which iteration to load? if load_iter > 0, the code will load models by iter_[load_iter]; otherwise, the code will load models by [epoch]')
         parser.add_argument('--verbose', action='store_true', help='if specified, print more debugging information')
         parser.add_argument('--suffix', default='', type=str, help='customized suffix: opt.name = opt.name + suffix: e.g., {model}_{netG}_size{load_size}')
+
+        #========================================================================================================================================================================
+
+        parser.add_argument('--cmodel', default='gwcnet-c', help='select a model structure', choices=__models__.keys())
+        parser.add_argument('--maxdisp', type=int, default=192, help='maximum disparity')
+
+        parser.add_argument('--dataset', required=True, help='dataset name', choices=__datasets__.keys())
+        parser.add_argument('--datapath', required=True, help='data path')
+        parser.add_argument('--depthpath', required=True, help='depth path')
+        parser.add_argument('--test_dataset', required=True, help='dataset name', choices=__datasets__.keys())
+        parser.add_argument('--test_datapath', required=True, help='data path')
+        parser.add_argument('--test_sim_datapath', required=True, help='data path')
+        parser.add_argument('--test_real_datapath', required=True, help='data path')
+        parser.add_argument('--trainlist', required=True, help='training list')
+        parser.add_argument('--testlist', required=True, help='testing list')
+        parser.add_argument('--sim_testlist', required=True, help='testing list')
+        parser.add_argument('--real_testlist', required=True, help='testing list')
+
+        parser.add_argument('--clr', type=float, default=0.001, help='base learning rate')
+        parser.add_argument('--cbatch_size', type=int, default=1, help='training batch size')
+        parser.add_argument('--test_batch_size', type=int, default=1, help='testing batch size')
+        parser.add_argument('--epochs', type=int, required=True, help='number of epochs to train')
+        parser.add_argument('--lrepochs', type=str, required=True, help='the epochs to decay lr: the downscale rate')
+
+        parser.add_argument('--logdir', required=True, help='the directory to save logs and checkpoints')
+        parser.add_argument('--loadckpt', help='load the weights from a specific checkpoint')
+        parser.add_argument('--resume', action='store_true', help='continue training the model')
+        parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
+
+        parser.add_argument('--summary_freq', type=int, default=50, help='the frequency of saving summary')
+        parser.add_argument('--test_summary_freq', type=int, default=50, help='the frequency of saving summary')
+        parser.add_argument('--save_freq', type=int, default=1, help='the frequency of saving checkpoint')
+
+        parser.add_argument('--log_freq', type=int, default=50, help='log freq')
+        parser.add_argument('--eval_freq', type=int, default=1, help='eval freq')
+        parser.add_argument("--local_rank", type=int, default=0)
+
+        parser.add_argument('--mode', type=str, default="train", help='train or test mode')
+
+
+        parser.add_argument('--ndisps', type=str, default="48,24", help='ndisps')
+        parser.add_argument('--disp_inter_r', type=str, default="4,1", help='disp_intervals_ratio')
+        parser.add_argument('--dlossw', type=str, default="0.5,2.0", help='depth loss weight for different stage')
+        parser.add_argument('--cr_base_chs', type=str, default="32,32,16", help='cost regularization base channels')
+        parser.add_argument('--grad_method', type=str, default="detach", choices=["detach", "undetach"], help='predicted disp detach, undetach')
+
+
+        parser.add_argument('--using_ns', action='store_true', help='using neighbor search')
+        parser.add_argument('--ns_size', type=int, default=3, help='nb_size')
+
+        parser.add_argument('--crop_height', type=int, required=True, help="crop height")
+        parser.add_argument('--crop_width', type=int, required=True, help="crop width")
+        parser.add_argument('--test_crop_height', type=int, required=True, help="crop height")
+        parser.add_argument('--test_crop_width', type=int, required=True, help="crop width")
+
+        parser.add_argument('--using_apex', action='store_true', help='using apex, need to install apex')
+        parser.add_argument('--sync_bn', action='store_true',help='enabling apex sync BN.')
+        parser.add_argument('--opt-level', type=str, default="O0")
+        parser.add_argument('--keep-batchnorm-fp32', type=str, default=None)
+        parser.add_argument('--loss-scale', type=str, default=None)
+
+        parser.add_argument('--feat_map', type=int, default=None)
+
+        parser.add_argument('--use_jitter', action='store_true', help='use color jitter.')
+        parser.add_argument('--use_blur', action='store_true', help='use gaussian blur.')
+        parser.add_argument('--diff_jitter', action='store_true', help='use different color jitter on both images.')
+        parser.add_argument('--brightness', type=str, default=None)
+        parser.add_argument('--contrast', type=str, default=None)
+        parser.add_argument('--kernel', type=int, default=None)
+        parser.add_argument('--var', type=str, default=None)
+
+        parser.add_argument('--simtosim', action='store_true', help='sim2sim training for gan.')
+
+        parser.add_argument('--dcropsize', type=int, default=None)
         self.initialized = True
         return parser
 
