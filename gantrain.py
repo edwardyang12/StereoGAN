@@ -320,15 +320,7 @@ def train():
 
             s1_gan.set_input(realfeaL['stage1'].detach(), simfeaL['stage1'].detach())         # unpack data from dataset and apply preprocessing
             s1_gan.optimize_parameters()
-
-            feature_outputs_sim = [simfeaL['stage1'][:,i,:,:] for i in range(32)]
-            feature_outputs_real = [realfeaL['stage1'][:,i,:,:] for i in range(32)]
-
-            fakeSim = s1_gan.fake_B
-
-            feature_fake_sim = [fakeSim[:,i,:,:] for i in range(32)]
-
-            image_outputs = {"imgSim": simsample['left'], "imgReal": realsample['left'], "feature_sim": feature_outputs_sim, "feature_real": feature_outputs_real, "feature_fake_sim": feature_fake_sim}
+  
             s1_gan.set_input(realfeaR['stage1'].detach(), simfeaR['stage1'].detach())         # unpack data from dataset and apply preprocessing
             s1_gan.optimize_parameters()
 
@@ -338,7 +330,30 @@ def train():
             s2_gan.set_input(realfeaR['stage2'].detach(), simfeaR['stage2'].detach())         # unpack data from dataset and apply preprocessing
             s2_gan.optimize_parameters()
 
+            
+
             if batch_idx % 50 == 0:
+                feature_outputs_sim_s1 = [simfeaL['stage1'][:,i,:,:] for i in range(1)]
+                feature_outputs_real_s1 = [realfeaL['stage1'][:,i,:,:] for i in range(1)]
+
+                fakeSim_s1 = s1_gan.fake_B
+
+                feature_fake_sim_s1 = [fakeSim_s1[:,i,:,:] for i in range(1)]
+
+                feature_outputs_sim_s2 = [simfeaL['stage2'][:,i,:,:] for i in range(1)]
+                feature_outputs_real_s2 = [realfeaL['stage2'][:,i,:,:] for i in range(1)]
+
+                fakeSim_s2 = s2_gan.fake_B
+
+                feature_fake_sim_s2 = [fakeSim_s2[:,i,:,:] for i in range(1)]
+                image_outputs = {"imgSim": simsample['left'], "imgReal": realsample['left'], "feature_sim_s1": feature_outputs_sim_s1, "feature_real_s1": feature_outputs_real_s1, "feature_fake_sim_s1": feature_fake_sim_s1,\
+                            "feature_sim_s2": feature_outputs_sim_s2, "feature_real_s2": feature_outputs_real_s2, "feature_fake_sim_s2": feature_fake_sim_s2}
+
+                scalar_outputs = {"loss_G_A_s1": s1_gan.loss_G_A, "loss_G_B_s1": s1_gan.loss_G_B, "loss_G_s1": s1_gan.loss_G, "loss_G_A_s2": s2_gan.loss_G_A, "loss_G_B_s2": s2_gan.loss_G_B, "loss_G_s2": s2_gan.loss_G, \
+                                "loss_D_A_s1": s1_gan.loss_D_A, "loss_D_B_s1": s1_gan.loss_D_B, "loss_D_A_s2": s2_gan.loss_D_A, "loss_D_B_s2": s2_gan.loss_D_B}
+
+
+                save_scalars(logger, 'train', scalar_outputs, global_step)
                 save_images(logger, 'train', image_outputs, global_step)
 
             """
