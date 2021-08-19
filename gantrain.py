@@ -157,23 +157,23 @@ model = __models__[args.cmodel](
 #discriminator = Discriminator(1, args.feat_map).cuda()
 #discriminator.apply(weights_init)
 
-opt_s1 = TrainOptions().parse()
+#opt_s1 = TrainOptions().parse()
 opt_s2 = TrainOptions().parse()
 
-opt_s1.input_nc = 32
-opt_s1.output_nc = 32
+#opt_s1.input_nc = 32
+#opt_s1.output_nc = 32
 
 opt_s2.input_nc = 16
 opt_s2.output_nc = 16
 
-opt_s1.checkpoints_dir = args.logdir
+#opt_s1.checkpoints_dir = args.logdir
 opt_s2.checkpoints_dir = args.logdir
 
-print(opt_s1.model, opt_s2.model)
+#print(opt_s1.model, opt_s2.model)
 
 
-s1_gan  = create_model(opt_s1)      # create a model given opt.model and other options
-s1_gan.setup(opt_s1)
+#s1_gan  = create_model(opt_s1)      # create a model given opt.model and other options
+#s1_gan.setup(opt_s1)
 
 s2_gan  = create_model(opt_s2)      # create a model given opt.model and other options
 s2_gan.setup(opt_s2)
@@ -302,7 +302,7 @@ def train():
     model.eval()
     for epoch_idx in range(start_epoch, args.epochs):
         #adjust_learning_rate(optimizer, epoch_idx, args.lr, args.lrepochs)
-        s1_gan.update_learning_rate()
+        #s1_gan.update_learning_rate()
         s2_gan.update_learning_rate()
 
         # training
@@ -349,8 +349,8 @@ def train():
         if (epoch_idx + 1) % args.save_freq == 0:
             if (not is_distributed) or (dist.get_rank() == 0):
                 #print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
-                s1_gan.save_networks('latest_s1')
-                s1_gan.save_networks('s1_' + epoch_idx)
+                #s1_gan.save_networks('latest_s1')
+                #s1_gan.save_networks('s1_' + epoch_idx)
 
                 s2_gan.save_networks('latest_s2')
                 s2_gan.save_networks('s2_' + epoch_idx)
