@@ -3,6 +3,8 @@ import os
 from utils import util
 import torch
 import nets as models
+from datasets import __datasets__
+from nets import __models__, __loss__
 #import data
 
 
