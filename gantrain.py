@@ -318,14 +318,14 @@ def train():
             s1_gan.set_input(realfeaL['stage1'], simfeaL['stage1'])         # unpack data from dataset and apply preprocessing
             s1_gan.optimize_parameters()
 
-            s1_gan.set_input(realfeaR['stage1'], simfeaR['stage1'])         # unpack data from dataset and apply preprocessing
-            s1_gan.optimize_parameters()
+            #s1_gan.set_input(realfeaR['stage1'], simfeaR['stage1'])         # unpack data from dataset and apply preprocessing
+            #s1_gan.optimize_parameters()
 
-            s2_gan.set_input(realfeaL['stage2'], simfeaL['stage2'])         # unpack data from dataset and apply preprocessing
-            s2_gan.optimize_parameters()
+            #s2_gan.set_input(realfeaL['stage2'], simfeaL['stage2'])         # unpack data from dataset and apply preprocessing
+            #s2_gan.optimize_parameters()
 
-            s2_gan.set_input(realfeaR['stage2'], simfeaR['stage2'])         # unpack data from dataset and apply preprocessing
-            s2_gan.optimize_parameters()
+            #s2_gan.set_input(realfeaR['stage2'], simfeaR['stage2'])         # unpack data from dataset and apply preprocessing
+            #s2_gan.optimize_parameters()
 
             """
             if (not is_distributed) or (dist.get_rank() == 0):
