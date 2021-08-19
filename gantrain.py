@@ -260,7 +260,7 @@ test_sim_dataset = Test_sim_StereoDataset(args.test_sim_datapath, args.sim_testl
                              crop_height=args.crop_height, crop_width=args.crop_width,
                              test_crop_height=args.test_crop_height, test_crop_width=args.test_crop_width,
                              left_img="0128_irL_denoised_half.png", right_img="0128_irR_denoised_half.png", args=args)
-test_real_dataset = Test_real_StereoDataset(args.test_real_datapath, args.real_testlist, False,
+test_real_dataset = Test_real_StereoDataset(args.test_real_datapath, args.real_testlist, True,
                              crop_height=args.crop_height, crop_width=args.crop_width,
                              test_crop_height=args.test_crop_height, test_crop_width=args.test_crop_width,
                              left_img="1024_irL_real_1080.png", right_img="1024_irR_real_1080.png", args=args)
