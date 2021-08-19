@@ -319,6 +319,14 @@ def train():
             s1_gan.set_input(realfeaL['stage1'].detach(), simfeaL['stage1'].detach())         # unpack data from dataset and apply preprocessing
             s1_gan.optimize_parameters()
 
+            feature_outputs_sim = [simfeaL['stage1'][:,i,:,:] for i in range(32)]
+            feature_outputs_real = [realfeaL['stage1'][:,i,:,:] for i in range(32)]
+
+            fakeSim = s1_gan.fake_B
+
+            feature_fake_sim = [fakeSim[:,i,:,:] for i in range(32)]
+
+            image_outputs = {"imgSim": simsample['left'], "imgReal": realsample['left'], "feature_sim": feature_outputs_sim, "feature_real": feature_outputs_real, "feature_fake_sim": feature_fake_sim}
             #s1_gan.set_input(realfeaR['stage1'].detach(), simfeaR['stage1'].detach())         # unpack data from dataset and apply preprocessing
             #s1_gan.optimize_parameters()
 
@@ -327,6 +335,9 @@ def train():
 
             #s2_gan.set_input(realfeaR['stage2'].detach(), simfeaR['stage2'].detach())         # unpack data from dataset and apply preprocessing
             #s2_gan.optimize_parameters()
+
+            if batch_idx % 50 == 0:
+                save_images(logger, 'train', image_outputs, global_step)
 
             """
             if (not is_distributed) or (dist.get_rank() == 0):
