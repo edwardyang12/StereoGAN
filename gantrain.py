@@ -158,16 +158,16 @@ model = __models__[args.cmodel](
 #discriminator.apply(weights_init)
 
 opt_s1 = TrainOptions().parse()
-#opt_s2 = TrainOptions().parse()
+opt_s2 = TrainOptions().parse()
 
 opt_s1.input_nc = 32
 opt_s1.output_nc = 32
 
-#opt_s2.input_nc = 16
-#opt_s2.output_nc = 16
+opt_s2.input_nc = 16
+opt_s2.output_nc = 16
 
 opt_s1.checkpoints_dir = args.logdir
-#opt_s2.checkpoints_dir = args.logdir
+opt_s2.checkpoints_dir = args.logdir
 
 #print(opt_s1.model, opt_s2.model)
 
@@ -175,8 +175,8 @@ opt_s1.checkpoints_dir = args.logdir
 s1_gan  = create_model(opt_s1)      # create a model given opt.model and other options
 s1_gan.setup(opt_s1)
 
-#s2_gan  = create_model(opt_s2)      # create a model given opt.model and other options
-#s2_gan.setup(opt_s2)
+s2_gan  = create_model(opt_s2)      # create a model given opt.model and other options
+s2_gan.setup(opt_s2)
 
 real_label = 1.
 fake_label = 0.
@@ -215,9 +215,9 @@ elif args.loadckpt:
     model.load_state_dict(state_dict['model'])
 print("start at epoch {}".format(start_epoch))
 
-print(state_dict['model'].keys())
+#print(state_dict['model'].keys())
 model = model.feature_extraction
-model.load_state_dict(state_dict['model.feature_extraction'])
+#model.load_state_dict(state_dict['model.feature_extraction'])
 
 if args.using_apex:
     # Initialize Amp
@@ -305,7 +305,7 @@ def train():
     for epoch_idx in range(start_epoch, args.epochs):
         #adjust_learning_rate(optimizer, epoch_idx, args.lr, args.lrepochs)
         s1_gan.update_learning_rate()
-        #s2_gan.update_learning_rate()
+        s2_gan.update_learning_rate()
 
         # training
         for batch_idx, simsample in enumerate(TrainImgLoader):
@@ -329,14 +329,14 @@ def train():
             feature_fake_sim = [fakeSim[:,i,:,:] for i in range(32)]
 
             image_outputs = {"imgSim": simsample['left'], "imgReal": realsample['left'], "feature_sim": feature_outputs_sim, "feature_real": feature_outputs_real, "feature_fake_sim": feature_fake_sim}
-            #s1_gan.set_input(realfeaR['stage1'].detach(), simfeaR['stage1'].detach())         # unpack data from dataset and apply preprocessing
-            #s1_gan.optimize_parameters()
+            s1_gan.set_input(realfeaR['stage1'].detach(), simfeaR['stage1'].detach())         # unpack data from dataset and apply preprocessing
+            s1_gan.optimize_parameters()
 
-            #s2_gan.set_input(realfeaL['stage2'].detach(), simfeaL['stage2'].detach())         # unpack data from dataset and apply preprocessing
-            #s2_gan.optimize_parameters()
+            s2_gan.set_input(realfeaL['stage2'].detach(), simfeaL['stage2'].detach())         # unpack data from dataset and apply preprocessing
+            s2_gan.optimize_parameters()
 
-            #s2_gan.set_input(realfeaR['stage2'].detach(), simfeaR['stage2'].detach())         # unpack data from dataset and apply preprocessing
-            #s2_gan.optimize_parameters()
+            s2_gan.set_input(realfeaR['stage2'].detach(), simfeaR['stage2'].detach())         # unpack data from dataset and apply preprocessing
+            s2_gan.optimize_parameters()
 
             if batch_idx % 50 == 0:
                 save_images(logger, 'train', image_outputs, global_step)
@@ -366,8 +366,8 @@ def train():
                 s1_gan.save_networks('latest_s1')
                 s1_gan.save_networks('s1_' + epoch_idx)
 
-                #s2_gan.save_networks('latest_s2')
-                #s2_gan.save_networks('s2_' + epoch_idx)
+                s2_gan.save_networks('latest_s2')
+                s2_gan.save_networks('s2_' + epoch_idx)
         gc.collect()
 
         """
