@@ -47,4 +47,4 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/g
     --var "0.1,2.0" \
     --dcropsize 64 \
     --clr 0.0001 \
-    #--loadckpt "/cephfs/jianyu/train/cs_train/checkpoint_best.ckpt"
+    --loadckpt "/cephfs/jianyu/eval/cs_train_f_1/checkpoint_best.ckpt"

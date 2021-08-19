@@ -193,7 +193,7 @@ print('Number of model parameters: {}'.format(sum([p.data.nelement() for p in mo
 
 #optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.clr, betas=(0.9, 0.999))
-optimizerD = optim.Adam(discriminator.parameters(), lr=args.clr, betas=(0.5, 0.999))
+#optimizerD = optim.Adam(discriminator.parameters(), lr=args.clr, betas=(0.5, 0.999))
 
 # load parameters
 start_epoch = 0
