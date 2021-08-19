@@ -2,7 +2,6 @@ import numpy as np
 import re
 import torchvision.transforms as transforms
 
-
 def get_transform():
     mean = [0.5]
     std = [0.5]
