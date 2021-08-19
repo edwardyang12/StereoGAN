@@ -215,11 +215,8 @@ elif args.loadckpt:
     model.load_state_dict(state_dict['model'])
 print("start at epoch {}".format(start_epoch))
 
-with torch.no_grad():
-    model.feature_extraction.weight.copy_(state_dict['model.feature_extraction.weight'])
-    model.feature_extraction.bias.copy_(state_dict['model.feature_extraction.bias'])
-
 model = model.feature_extraction
+model.load_state_dict(state_dict['model.feature_extraction'])
 
 if args.using_apex:
     # Initialize Amp
