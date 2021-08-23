@@ -1,0 +1,23 @@
+# Config files for local testing
+
+# Directories
+DIR:
+  DATASET: '/code/dataset_local_v9/training'  #  path to your sim testing dataset
+
+# Split files
+SPLIT:
+  VAL: '/code/dataset_local_v9/training_lists/all.txt'  # training lists of your sim dataset
+  LEFT: '0128_irL_denoised_half.png'
+  RIGHT: '0128_irR_denoised_half.png'
+  DEPTHL: 'depthL.png'
+  DEPTHR: 'depthR.png'
+  META: 'meta.pkl'
+  LABEL: 'irL_label_image.png'
+
+# Real dataset
+REAL:
+  DATASET: '/code/real_dataset_local_v9'  # path to your real testing dataset
+  LEFT: '1024_irL_real_1080.png'
+  RIGHT: '1024_irR_real_1080.png'
+  PAD_WIDTH: 960
+  PAD_HEIGHT: 544

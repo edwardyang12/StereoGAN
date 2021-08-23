@@ -1,1 +1,0 @@
-results on 1+0.1 and the other ones don't modify miniD criterion by ratio also

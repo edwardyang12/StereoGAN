@@ -1,0 +1,58 @@
+# Config files for local training
+
+# Directories
+DIR:
+  DATASET: '/code/dataset_local_v9/training'  #  directory of your training dataset
+
+# Split files
+SPLIT:
+  TRAIN: '/code/dataset_local_v9/training_lists/all_train.txt'  # training lists of your training dataset
+  VAL: '/code/dataset_local_v9/training_lists/all_val.txt'  # training lists of your validation dataset
+  LEFT: '0128_irL_denoised_half.png'
+  RIGHT: '0128_irR_denoised_half.png'
+  DEPTHL: 'depthL.png'
+  DEPTHR: 'depthR.png'
+  META: 'meta.pkl'
+  LABEL: 'irL_label_image.png'
+
+
+REAL:
+  DATASET: '/code/real_dataset_local_v9'  # path to your real testing dataset
+  LEFT: '1024_irL_real_1080.png'
+  RIGHT: '1024_irR_real_1080.png'
+
+# Solver args
+SOLVER:
+  LR_CASCADE: 0.001         # base learning rate for cascade
+  LR_GAN: 0.0002            # base learning rate for GAN
+  LR_EPOCHS: '5,10,15:2'    # the epochs to decay lr: the downscale rate
+  EPOCHS: 6                # number of epochs to train
+  BATCH_SIZE: 1             # batch size
+  NUM_WORKER: 0             # num_worker in dataloader
+
+# Model parameters
+ARGS:
+  MAX_DISP: 192             # maximum disparity
+  MODEL: 'gwcnet-c'
+  GRAD_METHOD: 'detach'
+  NDISP: (48, 24)           # ndisps
+  DISP_INTER_R: (4, 1)      # disp_intervals_ratio
+  DLOSSW: (0.5, 2.0)        # depth loss weight for different stage
+  CR_BASE_CHS: (32, 32, 16) # cost regularization base channels
+  USING_NS: True            # using neighbor search
+  NS_SIZE: 3                # nb_size
+  CROP_HEIGHT: 256          # crop height
+  CROP_WIDTH: 512           # crop width
+
+# Data augmentation
+DATA_AUG:
+  # Color jitter
+  BRIGHT_MIN: 0.4
+  BRIGHT_MAX: 1.4
+  CONTRAST_MIN: 0.8
+  CONTRAST_MAX: 1.2
+
+  # Gaussian blur
+  GAUSSIAN_MIN: 0.1
+  GAUSSIAN_MAX: 2
+  GAUSSIAN_KERNEL: 9
