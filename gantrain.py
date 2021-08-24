@@ -216,7 +216,7 @@ print("start at epoch {}".format(start_epoch))
 #print(state_dict['model'].keys())
 feaex = model.feature_extraction
 #model.load_state_dict(state_dict['model.feature_extraction'])
-c_gan = create_model(opt, model)
+
 
 if args.using_apex:
     # Initialize Amp
@@ -239,6 +239,8 @@ else:
     if torch.cuda.is_available():
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         model = nn.DataParallel(model)
+
+c_gan = create_model(opt, model)
 
 
 # dataset, dataloader
