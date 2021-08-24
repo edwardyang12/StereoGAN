@@ -395,6 +395,7 @@ class PSMNet(nn.Module):
         #print("left g: ", left_g.shape, left_g)
 
         if self.traingan:
+            print("success")
             refimg_msfea = self.refimg_msfea
             targetimg_msfea = self.targetimg_msfea
         else:
