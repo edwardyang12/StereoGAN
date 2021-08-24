@@ -298,7 +298,7 @@ class GetCostVolume(nn.Module):
         mw = mw.reshape(1, 1, height, width).repeat(bs, ndisp, 1, 1)  # (B, D, H, W)
 
         cur_disp_coords_y = mh
-        print(mw.shape, disp_range_samples.shape)
+        #print(mw.shape, disp_range_samples.shape)
         cur_disp_coords_x = mw - disp_range_samples
 
         coords_x = cur_disp_coords_x / ((width - 1.0) / 2.0) - 1.0  # trans to -1 - 1
@@ -396,7 +396,7 @@ class PSMNet(nn.Module):
         #print("left g: ", left_g.shape, left_g)
 
         if self.traingan:
-            print("success")
+            #print("success")
             refimg_msfea = self.refimg_msfea
             targetimg_msfea = self.targetimg_msfea
         else:
