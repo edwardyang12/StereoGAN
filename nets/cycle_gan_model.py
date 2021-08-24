@@ -88,6 +88,8 @@ class CycleGANModel(BaseModel):
 
         self.opt = opt
 
+        self.dummy_input = torch.zeros([1,3,256,512])
+
         if self.isTrain:  # define discriminators
             self.s1_netD_A = networks.define_D(opt.s1_output_nc, opt.ndf, opt.netD,
                                             opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
@@ -177,7 +179,7 @@ class CycleGANModel(BaseModel):
 
         self.cascade.module.set_gan_train(self.s1_fake_B_sim_L, self.s2_fake_B_sim_L, self.s1_fake_B_sim_R, self.s2_fake_B_sim_R)
 
-        self.cs_outputs = self.cascade(self.s2_fake_B_sim_L, self.s2_fake_B_sim_R)
+        self.cs_outputs = self.cascade(self.dummy_input, self.dummy_input)
 
     def backward_D_basic(self, netD, real, fake):
         """Calculate GAN loss for the discriminator
