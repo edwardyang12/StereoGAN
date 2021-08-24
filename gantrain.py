@@ -305,7 +305,7 @@ def train():
     feaex.eval()
     for epoch_idx in range(start_epoch, args.epochs):
         #adjust_learning_rate(optimizer, epoch_idx, args.lr, args.lrepochs)
-        cgan.update_learning_rate()
+        c_gan.update_learning_rate()
 
         # training
         for batch_idx, simsample in enumerate(TrainImgLoader):
