@@ -174,8 +174,8 @@ class CycleGANModel(BaseModel):
         self.s2_rec_B_sim_R = self.s2_netG_A(self.s2_fake_A_real_R)   # G_A(G_B(B))
 
 
-        print(self.s1_real_L.shape, self.s1_real_R.shape, self.s2_real_L.shape, self.s2_real_R.shape)
-        print(self.s1_fake_B_sim_L.shape, self.s2_fake_B_sim_L.shape, self.s1_fake_B_sim_R.shape, self.s2_fake_B_sim_R.shape)
+        #print(self.s1_real_L.shape, self.s1_real_R.shape, self.s2_real_L.shape, self.s2_real_R.shape)
+        #print(self.s1_fake_B_sim_L.shape, self.s2_fake_B_sim_L.shape, self.s1_fake_B_sim_R.shape, self.s2_fake_B_sim_R.shape)
 
         self.cascade.module.set_gan_train(self.s1_fake_B_sim_L, self.s2_fake_B_sim_L, self.s1_fake_B_sim_R, self.s2_fake_B_sim_R)
 
@@ -340,7 +340,7 @@ class CycleGANModel(BaseModel):
         # forward
         self.forward()      # compute fake images and reconstruction images.
         # G_A and G_B
-        self.set_requires_grad([self.netD_A, self.netD_B], False)  # Ds require no gradients when optimizing Gs
+        self.set_requires_grad([self.s1_netD_A, self.s1_netD_B, self.s2_netD_A, self.s2_netD_B], False)  # Ds require no gradients when optimizing Gs
         self.s1_optimizer_G.zero_grad()  # set G_A and G_B's gradients to zero
         self.s2_optimizer_G.zero_grad()  # set G_A and G_B's gradients to zero
         self.optimizer_cascade.zero_grad()
@@ -350,7 +350,7 @@ class CycleGANModel(BaseModel):
         self.optimizer_cascade.step()
         # D_A and D_B
         # D_A and D_B
-        self.set_requires_grad([self.netD_A, self.netD_B], True)
+        self.set_requires_grad([self.s1_netD_A, self.s1_netD_B, self.s2_netD_A, self.s2_netD_B], True)
         self.s1_optimizer_D.zero_grad()   # set D_A and D_B's gradients to zero
         self.s2_optimizer_D.zero_grad()   # set D_A and D_B's gradients to zero
         self.backward_D_A()      # calculate gradients for D_A
