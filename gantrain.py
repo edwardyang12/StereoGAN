@@ -319,6 +319,8 @@ def train():
             simfeaL, simfeaR, sim_gt = feaex(simsample['left'].cuda()), feaex(simsample['right'].cuda()), simsample['disparity'].cuda()
             realfeaL, realfeaR, real_gt = feaex(realsample['left'].cuda()), feaex(realsample['right'].cuda()), realsample['disparity'].cuda()
 
+            print("sim_fea: ", simfeaL['stage1'].shape, simfeaL['stage2'].shape)
+
             c_gan.set_input(simfeaL['stage1'].detach(), simfeaR['stage1'].detach(), simfeaL['stage2'].detach(), simfeaR['stage2'].detach(), realfeaL['stage1'].detach(), realfeaR['stage1'].detach(), realfeaL['stage2'].detach(), realfeaR['stage2'].detach(), real_gt)         # unpack data from dataset and apply preprocessing
             c_gan.optimize_parameters()
 
