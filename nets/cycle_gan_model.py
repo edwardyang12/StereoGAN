@@ -168,6 +168,7 @@ class CycleGANModel(BaseModel):
         self.s2_fake_A_real_L = self.s2_netG_B(self.s2_sim_L)  # G_B(B)
         self.s2_rec_B_sim_L = self.s2_netG_A(self.s2_fake_A_real_L)   # G_A(G_B(B))
 
+        print("realinput: ", self.s2_real_R.shape)
         self.s2_fake_B_sim_R = self.s2_netG_A(self.s2_real_R)  # G_A(A)
         self.s2_rec_A_real_R = self.s2_netG_B(self.s2_fake_B_sim_R)   # G_B(G_A(A))
         self.s2_fake_A_real_R = self.s2_netG_B(self.s2_sim_R)  # G_B(B)
