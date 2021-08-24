@@ -33,7 +33,7 @@ python -m torch.distributed.launch --nproc_per_node=1 /cephfs/jianyu/StereoGAN/g
     --using_ns \
     --ns_size 3 \
     --cmodel gwcnet-c \
-    --logdir "/cephfs/jianyu/eval/cs_train_cgan_test_f"  \
+    --logdir "/cephfs/jianyu/eval/cs_train_cgan_test_joint"  \
     --ndisps "48,24" \
     --disp_inter_r "4,1"  \
     --cbatch_size 1 \
