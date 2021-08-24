@@ -378,8 +378,10 @@ class PSMNet(nn.Module):
             elif isinstance(m, nn.Linear):
                 m.bias.data.zero_()
 
-    def set_gan_train(self):
-        self.traingan = not self.traingan
+    def set_gan_train(self, refimg_msfea_s1, refimg_msfea_s2, targetimg_msfea_s1, targetimg_msfea_s2):
+        self.traingan = True
+        self.refimg_msfea = {'stage1': refimg_msfea_s1, 'stage2': refimg_msfea_s2}
+        self.targetimg_msfea = {'stage1': targetimg_msfea_s1, 'stage2': targetimg_msfea_s2}
 
 
     def forward(self, left, right):
@@ -392,12 +394,13 @@ class PSMNet(nn.Module):
 
         #print("left g: ", left_g.shape, left_g)
 
-
-        refimg_msfea = self.feature_extraction(left)
-        targetimg_msfea = self.feature_extraction(right)
-
         if self.traingan:
-            return refimg_msfea, targetimg_msfea
+            refimg_msfea = self.refimg_msfea
+            targetimg_msfea = self.targetimg_msfea
+        else:
+            refimg_msfea = self.feature_extraction(left)
+            targetimg_msfea = self.feature_extraction(right)
+
 
         outputs = {}
 

@@ -166,7 +166,7 @@ class MESSYDataset(Dataset):
 
             return {"left": left_img,
                     "right": right_img,
-                    "disparity": disparity_R}
+                    "disparity": disparity_L}
         else:
             #print(torch.all(torch.tensor(disparity_R) >= 0))
             w, h = left_img.size

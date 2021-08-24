@@ -157,42 +157,40 @@ model = __models__[args.cmodel](
 #discriminator = Discriminator(1, args.feat_map).cuda()
 #discriminator.apply(weights_init)
 
-opt_s1 = TrainOptions().parse()
-opt_s2 = TrainOptions().parse()
+opt = TrainOptions().parse()
 
-opt_s1.input_nc = 32
-opt_s1.output_nc = 32
+#opt_s1.input_nc = 32
+#opt_s1.output_nc = 32
 
-opt_s2.input_nc = 16
-opt_s2.output_nc = 16
+#opt_s2.input_nc = 16
+#opt_s2.output_nc = 16
 
-opt_s1.checkpoints_dir = args.logdir
-opt_s2.checkpoints_dir = args.logdir
+#opt_s1.checkpoints_dir = args.logdir
+opt.checkpoints_dir = args.logdir
 
 #print(opt_s1.model, opt_s2.model)
 
 
-s1_gan  = create_model(opt_s1)      # create a model given opt.model and other options
-s1_gan.setup(opt_s1)
+#s1_gan  = create_model(opt_s1)      # create a model given opt.model and other options
+#s1_gan.setup(opt_s1)
 
-s2_gan  = create_model(opt_s2)      # create a model given opt.model and other options
-s2_gan.setup(opt_s2)
+      # create a model given opt.model and other options
+#s2_gan.setup(opt_s2)
 
-real_label = 1.
-fake_label = 0.
+
 
 if args.sync_bn:
     import apex
     print("using apex synced BN")
     model = apex.parallel.convert_syncbn_model(model)
 
-criterion = nn.BCELoss()
-model_loss = __loss__[args.cmodel]
+#criterion = nn.BCELoss()
+#model_loss = __loss__[args.cmodel]
 model.cuda()
 print('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
 
 #optimizer
-optimizer = optim.Adam(model.parameters(), lr=args.clr, betas=(0.9, 0.999))
+#optimizer = optim.Adam(model.parameters(), lr=args.clr, betas=(0.9, 0.999))
 #optimizerD = optim.Adam(discriminator.parameters(), lr=args.clr, betas=(0.5, 0.999))
 
 # load parameters
@@ -216,8 +214,9 @@ elif args.loadckpt:
 print("start at epoch {}".format(start_epoch))
 
 #print(state_dict['model'].keys())
-model = model.feature_extraction
+feaex = model.feature_extraction
 #model.load_state_dict(state_dict['model.feature_extraction'])
+c_gan = create_model(opt, model)
 
 if args.using_apex:
     # Initialize Amp
@@ -301,11 +300,10 @@ def train():
     avg_test_scalars = None
     Cur_D1 = 1
     #model.set_gan_train()
-    model.eval()
+    feaex.eval()
     for epoch_idx in range(start_epoch, args.epochs):
         #adjust_learning_rate(optimizer, epoch_idx, args.lr, args.lrepochs)
-        s1_gan.update_learning_rate()
-        s2_gan.update_learning_rate()
+        cgan.update_learning_rate()
 
         # training
         for batch_idx, simsample in enumerate(TrainImgLoader):
@@ -315,20 +313,11 @@ def train():
             start_time = time.time()
             do_summary = global_step % args.summary_freq == 0
             #loss, scalar_outputs, image_outputs = train_sample(sample, batch_idx, compute_metrics=do_summary)
-            simfeaL, simfeaR = model(simsample['left'].cuda()), model(simsample['right'].cuda())
-            realfeaL, realfeaR = model(realsample['left'].cuda()), model(realsample['right'].cuda())
+            simfeaL, simfeaR, sim_gt = feaex(simsample['left'].cuda()), feaex(simsample['right'].cuda()), simsample['disparity'].cuda()
+            realfeaL, realfeaR, real_gt = feaex(realsample['left'].cuda()), feaex(realsample['right'].cuda()), realsample['disparity'].cuda()
 
-            s1_gan.set_input(realfeaL['stage1'].detach(), simfeaL['stage1'].detach())         # unpack data from dataset and apply preprocessing
-            s1_gan.optimize_parameters()
-  
-            s1_gan.set_input(realfeaR['stage1'].detach(), simfeaR['stage1'].detach())         # unpack data from dataset and apply preprocessing
-            s1_gan.optimize_parameters()
-
-            s2_gan.set_input(realfeaL['stage2'].detach(), simfeaL['stage2'].detach())         # unpack data from dataset and apply preprocessing
-            s2_gan.optimize_parameters()
-
-            s2_gan.set_input(realfeaR['stage2'].detach(), simfeaR['stage2'].detach())         # unpack data from dataset and apply preprocessing
-            s2_gan.optimize_parameters()
+            c_gan.set_input(simfeaL['stage1'].detach(), simfeaR['stage1'].detach(), simfeaL['stage2'].detach(), simfeaR['stage2'].detach(), realfeaL['stage1'].detach(), realfeaR['stage1'].detach(), realfeaL['stage2'].detach(), realfeaR['stage2'].detach(), real_gt)         # unpack data from dataset and apply preprocessing
+            c_gan.optimize_parameters()
 
             
 
@@ -336,21 +325,27 @@ def train():
                 feature_outputs_sim_s1 = [simfeaL['stage1'][:,i,:,:] for i in range(1)]
                 feature_outputs_real_s1 = [realfeaL['stage1'][:,i,:,:] for i in range(1)]
 
-                fakeSim_s1 = s1_gan.fake_B
+                fakeSim_s1 = c_gan.s1_fake_B_sim_L
 
                 feature_fake_sim_s1 = [fakeSim_s1[:,i,:,:] for i in range(1)]
 
                 feature_outputs_sim_s2 = [simfeaL['stage2'][:,i,:,:] for i in range(1)]
                 feature_outputs_real_s2 = [realfeaL['stage2'][:,i,:,:] for i in range(1)]
 
-                fakeSim_s2 = s2_gan.fake_B
+                fakeSim_s2 = c_gan.s2_fake_B_sim_L
 
                 feature_fake_sim_s2 = [fakeSim_s2[:,i,:,:] for i in range(1)]
-                image_outputs = {"imgSim": simsample['left'], "imgReal": realsample['left'], "feature_sim_s1": feature_outputs_sim_s1, "feature_real_s1": feature_outputs_real_s1, "feature_fake_sim_s1": feature_fake_sim_s1,\
+
+                outputs_stage = c_gan.cs_outputs["stage{}".format(num_stage)]
+                disp_ests = [outputs_stage["pred1"], outputs_stage["pred2"], outputs_stage["pred3"]]
+                image_outputs = {"imgSim": simsample['left'], "imgReal_L": realsample['left'], "imgReal_R": realsample['right'], "Dis_gt": realsample['disparity'], \
+                            "Dis_est": disp_ests, "feature_sim_s1": feature_outputs_sim_s1, "feature_real_s1": feature_outputs_real_s1, "feature_fake_sim_s1": feature_fake_sim_s1,\
                             "feature_sim_s2": feature_outputs_sim_s2, "feature_real_s2": feature_outputs_real_s2, "feature_fake_sim_s2": feature_fake_sim_s2}
 
-                scalar_outputs = {"loss_G_A_s1": s1_gan.loss_G_A, "loss_G_B_s1": s1_gan.loss_G_B, "loss_G_s1": s1_gan.loss_G, "loss_G_A_s2": s2_gan.loss_G_A, "loss_G_B_s2": s2_gan.loss_G_B, "loss_G_s2": s2_gan.loss_G, \
-                                "loss_D_A_s1": s1_gan.loss_D_A, "loss_D_B_s1": s1_gan.loss_D_B, "loss_D_A_s2": s2_gan.loss_D_A, "loss_D_B_s2": s2_gan.loss_D_B}
+                image_outputs["errormap"] = [disp_error_image_func.apply(disp_est, realsample['disparity']) for disp_est in disp_ests]
+
+                scalar_outputs = {"loss_G_s1": c_gan.s1_loss_G, "loss_G_s2": c_gan.s2_loss_G, \
+                                "loss_D_A_s1": c_gan.s1_loss_D_A_L, "loss_D_B_s1": c_gan.s1_loss_D_B_L, "loss_D_A_s2": c_gan.s2_loss_D_A_L, "loss_D_B_s2": c_gan.s2_loss_D_B_L}
 
 
                 save_scalars(logger, 'train', scalar_outputs, global_step)
@@ -378,11 +373,9 @@ def train():
         if (epoch_idx + 1) % args.save_freq == 0:
             if (not is_distributed) or (dist.get_rank() == 0):
                 #print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
-                s1_gan.save_networks('latest_s1')
-                s1_gan.save_networks('s1_' + epoch_idx)
+                c_gan.save_networks('latest_s1')
+                c_gan.save_networks('s1_' + epoch_idx)
 
-                s2_gan.save_networks('latest_s2')
-                s2_gan.save_networks('s2_' + epoch_idx)
         gc.collect()
 
         """
@@ -433,7 +426,7 @@ def train():
             gc.collect()
             """
 
-
+"""
 # train one sample
 def train_sample(sample, indx, compute_metrics=False):
     model.train()
@@ -583,7 +576,7 @@ def train_sample(sample, indx, compute_metrics=False):
         scalar_outputs = reduce_scalar_outputs(scalar_outputs)
 
     return tensor2float(scalar_outputs["loss"]), tensor2float(scalar_outputs), image_outputs
-
+"""
 
 # test one sample
 @make_nograd_func
@@ -692,6 +685,7 @@ def test_sample(sample, compute_metrics=True):
         scalar_outputs = reduce_scalar_outputs(scalar_outputs)
 
     return tensor2float(scalar_outputs["loss"]), tensor2float(scalar_outputs), image_outputs
+
 
 #def warp(label, disp):
 #    label = torch.tensor(label).reshape((1,1,540,960)).float().cuda()

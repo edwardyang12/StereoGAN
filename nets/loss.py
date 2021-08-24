@@ -22,7 +22,7 @@ def model_psmnet_loss(disp_ests, disp_gt, mask):
     return sum(all_losses)
 
 
-def stereo_psmnet_loss(inputs, target, mask, criterion, out_l, out_r, label, **kwargs):
+def stereo_psmnet_loss(inputs, target, mask, **kwargs):
 
     disp_loss_weights = kwargs.get("dlossw", None)
 
@@ -41,11 +41,9 @@ def stereo_psmnet_loss(inputs, target, mask, criterion, out_l, out_r, label, **k
         else:
             total_loss += loss
 
-    errG_l = criterion(out_l, label)
-    errG_r = criterion(out_r, label)
     #print("errGl: ", errG_l, " ", out_l, " ", label)
     #print("errGr: ", errG_r, " ", out_r, " ", label)
 
-    total_loss = total_loss + (errG_l + errG_r)
+    total_loss = total_loss
     #total_loss = errG_l + errG_r
-    return total_loss, (errG_l + errG_r)
+    return total_loss
