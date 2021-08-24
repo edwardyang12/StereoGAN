@@ -4,9 +4,6 @@ from torch.utils.data import Dataset
 from PIL import Image
 import numpy as np
 from datasets.data_io import get_transform_test, read_all_lines
-import pandas as pd
-from math import inf
-import cv2
 
 class CustomDatasetTest(Dataset):
     def __init__(self, datapath, list_filename):
