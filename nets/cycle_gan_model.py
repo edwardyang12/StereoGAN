@@ -207,31 +207,31 @@ class CycleGANModel(BaseModel):
 
     def backward_D_A(self):
         """Calculate GAN loss for discriminator D_A"""
-        s1_fake_B_L = self.fake_B_pool.query(self.s1_fake_B_sim_L)
+        s1_fake_B_L = self.s1_fake_B_sim_L
         self.s1_loss_D_A_L = self.backward_D_basic(self.s1_netD_A, self.s1_sim_L, s1_fake_B_L)
 
-        s2_fake_B_L = self.fake_B_pool.query(self.s2_fake_B_sim_L)
+        s2_fake_B_L = self.s2_fake_B_sim_L
         self.s2_loss_D_A_L = self.backward_D_basic(self.s2_netD_A, self.s2_sim_L, s2_fake_B_L)
 
-        s1_fake_B_R = self.fake_B_pool.query(self.s1_fake_B_sim_R)
+        s1_fake_B_R = self.s1_fake_B_sim_R
         self.s1_loss_D_A_R = self.backward_D_basic(self.s1_netD_A, self.s1_sim_R, s1_fake_B_R)
 
-        s2_fake_B_R = self.fake_B_pool.query(self.s2_fake_B_sim_R)
+        s2_fake_B_R = self.s2_fake_B_sim_R
         print(self.s2_sim_R.shape, s2_fake_B_R.shape)
         self.s2_loss_D_A_R = self.backward_D_basic(self.s2_netD_A, self.s2_sim_R, s2_fake_B_R)
 
     def backward_D_B(self):
         """Calculate GAN loss for discriminator D_B"""
-        s1_fake_A_L = self.fake_A_pool.query(self.s1_fake_A_real_L)
+        s1_fake_A_L = self.s1_fake_A_real_L
         self.s1_loss_D_B_L = self.backward_D_basic(self.s1_netD_B, self.s1_real_L, s1_fake_A_L)
 
-        s2_fake_A_L = self.fake_A_pool.query(self.s2_fake_A_real_L)
+        s2_fake_A_L = self.s2_fake_A_real_L
         self.s2_loss_D_B_L = self.backward_D_basic(self.s2_netD_B, self.s2_real_L, s2_fake_A_L)
 
-        s1_fake_A_R = self.fake_A_pool.query(self.s1_fake_A_real_R)
+        s1_fake_A_R = self.s1_fake_A_real_R
         self.s1_loss_D_B_R = self.backward_D_basic(self.s1_netD_B, self.s1_real_R, s1_fake_A_R)
 
-        s2_fake_A_R = self.fake_A_pool.query(self.s2_fake_A_real_L)
+        s2_fake_A_R = self.s2_fake_A_real_L
         self.s2_loss_D_B_R = self.backward_D_basic(self.s2_netD_B, self.s2_real_R, s2_fake_A_R)
 
     def backward_G(self):
