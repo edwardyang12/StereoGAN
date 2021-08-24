@@ -241,6 +241,7 @@ else:
         model = nn.DataParallel(model)
 
 c_gan = create_model(opt, model)
+c_gan.setup(opt)
 
 
 # dataset, dataloader
