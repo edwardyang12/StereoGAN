@@ -146,7 +146,7 @@ class CycleGANModel(BaseModel):
 
         self.real_gt = real_gt.to(self.device)
 
-        self.mask = (disp_gt < opt.maxdisp) & (disp_gt > 0)
+        self.mask = (self.real_gt < opt.maxdisp) & (self.real_gt > 0)
         #self.image_paths = input['A_paths' if AtoB else 'B_paths']
 
     def forward(self):
