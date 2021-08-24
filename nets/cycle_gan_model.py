@@ -170,7 +170,7 @@ class CycleGANModel(BaseModel):
 
         
         self.s2_fake_B_sim_R = self.s2_netG_A(self.s2_real_R)  # G_A(A)
-        print("realinput: ", self.s2_fake_B_sim_R.shape)
+        #print("realinput: ", self.s2_fake_B_sim_R.shape)
         self.s2_rec_A_real_R = self.s2_netG_B(self.s2_fake_B_sim_R)   # G_B(G_A(A))
         self.s2_fake_A_real_R = self.s2_netG_B(self.s2_sim_R)  # G_B(B)
         self.s2_rec_B_sim_R = self.s2_netG_A(self.s2_fake_A_real_R)   # G_A(G_B(B))
@@ -217,7 +217,7 @@ class CycleGANModel(BaseModel):
         self.s1_loss_D_A_R = self.backward_D_basic(self.s1_netD_A, self.s1_sim_R, s1_fake_B_R)
 
         s2_fake_B_R = self.s2_fake_B_sim_R
-        print(self.s2_sim_R.shape, s2_fake_B_R.shape)
+        #print(self.s2_sim_R.shape, s2_fake_B_R.shape)
         self.s2_loss_D_A_R = self.backward_D_basic(self.s2_netD_A, self.s2_sim_R, s2_fake_B_R)
 
     def backward_D_B(self):
