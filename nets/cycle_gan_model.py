@@ -171,7 +171,7 @@ class CycleGANModel(BaseModel):
         self.s2_fake_A_real_R = self.s2_netG_B(self.s2_sim_R)  # G_B(B)
         self.s2_rec_B_sim_R = self.s2_netG_A(self.s2_fake_A_real_R)   # G_A(G_B(B))
 
-        self.cascade.set_gan_train(self.s1_fake_B_sim_L, self.s2_fake_B_sim_L, self.s1_fake_B_sim_R, self.s2_fake_B_sim_R)
+        self.cascade.module.set_gan_train(self.s1_fake_B_sim_L, self.s2_fake_B_sim_L, self.s1_fake_B_sim_R, self.s2_fake_B_sim_R)
 
         self.cs_outputs = self.cascade(self.s2_fake_B_sim_L, self.s2_fake_B_sim_R)
 
