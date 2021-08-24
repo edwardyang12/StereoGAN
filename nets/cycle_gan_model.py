@@ -64,7 +64,7 @@ class CycleGANModel(BaseModel):
         self.visual_names = visual_names_A + visual_names_B  # combine visualizations for A and B
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>.
         if self.isTrain:
-            self.model_names = ['G_A', 'G_B', 'D_A', 'D_B']
+            self.model_names = ['s1_netG_A', 's1_netG_B', 's2_netG_A', 's2_netG_B', 's1_netD_A', 's1_netD_B', 's2_netD_A', 's2_netD_B']
         else:  # during test time, only load Gs
             self.model_names = ['G_A', 'G_B']
 
