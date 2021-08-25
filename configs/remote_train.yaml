@@ -42,8 +42,8 @@ ARGS:
   CR_BASE_CHS: (32, 32, 16) # cost regularization base channels
   USING_NS: True            # using neighbor search
   NS_SIZE: 3                # nb_size
-  CROP_HEIGHT: 256          # crop height
-  CROP_WIDTH: 256           # crop width
+  CROP_HEIGHT: 128          # crop height
+  CROP_WIDTH: 128           # crop width
 
 # Data augmentation
 DATA_AUG:
