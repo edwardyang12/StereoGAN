@@ -26,8 +26,8 @@ class CycleGANModel:
         self.isTrain = isTrain
 
         # Define networks for both generators and discriminators
-        self.netG_A = define_G(input_nc=1, output_nc=1, ngf=64, netG='resnet_9blocks', norm='instance')
-        self.netG_B = define_G(input_nc=1, output_nc=1, ngf=64, netG='resnet_9blocks', norm='instance')
+        self.netG_A = define_G(input_nc=1, output_nc=1, ngf=64, netG='unet_128', norm='instance')
+        self.netG_B = define_G(input_nc=1, output_nc=1, ngf=64, netG='unet_128', norm='instance')
 
         if self.isTrain:
             self.netD_A = define_D(input_nc=1, ndf=64, netD='basic')
