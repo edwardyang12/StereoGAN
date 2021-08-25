@@ -537,4 +537,3 @@ class GANLoss(nn.Module):
             else:
                 loss = prediction.mean()
         return loss
-
