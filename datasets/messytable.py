@@ -150,8 +150,8 @@ class MessytableDataset(Dataset):
         img_real_rgb = img_real_rgb[2*x: 2*(x+th), 2*y: 2*(y+tw)]  # real original res in 1080*1920
 
         item = {}
-        item['img_L'] = torch.tensor(img_L_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 3, H, W]
-        item['img_R'] = torch.tensor(img_R_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 3, H, W]
+        item['img_L'] = torch.tensor(img_L_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
+        item['img_R'] = torch.tensor(img_R_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
         item['img_real'] = torch.tensor(img_real_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 3, 2*H, 2*W]
         item['img_disp_l'] = torch.tensor(img_disp_l, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W] in dataloader
         item['img_depth_l'] = torch.tensor(img_depth_l, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W]

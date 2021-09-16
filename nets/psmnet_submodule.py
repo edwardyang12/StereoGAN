@@ -80,7 +80,7 @@ class FeatureExtraction(nn.Module):
         self.inplanes = 32
         # conv0_1, conv0_2, conv0_3
         self.firstconv = nn.Sequential(
-            convbn(3, 32, 3, 2, 1, 1),
+            convbn(1, 32, 3, 2, 1, 1),
             nn.ReLU(inplace=True),
             convbn(32, 32, 3, 1, 1, 1),
             nn.ReLU(inplace=True),
@@ -188,7 +188,14 @@ class FeatureExtraction(nn.Module):
 
 if __name__ == '__main__':
     # Unit test
-    img_test = torch.rand(1, 3, 540, 960).cuda()
+    img_test = torch.rand(1, 1, 540, 960).cuda()
     feature_extraction = FeatureExtraction().cuda()
     output_features = feature_extraction(img_test)
     print(output_features.shape)    # torch.Size([1, 32, 135, 240])
+
+    # Test backward
+    feature_target = torch.rand(1, 32, 135, 240).cuda()
+    mask = (feature_target > 0.1) * (feature_target < 0.8)
+    loss = F.smooth_l1_loss(feature_target[mask], output_features[mask])
+    loss.backward()
+    print(f'Loss {loss.item()}')

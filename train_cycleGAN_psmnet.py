@@ -1,6 +1,6 @@
 """
-Author: Isabella Liu 8/14/21
-Feature: Train cycle GAN with cascade
+Author: Isabella Liu 9/7/21
+Feature: Train cycle GAN with PSMNet
 """
 import gc
 import os
@@ -13,8 +13,8 @@ import torch.distributed as dist
 import torch.nn.functional as F
 
 from datasets.messytable import MessytableDataset
+from nets.psmnet import PSMNet
 from nets.cycle_gan import CycleGANModel
-from nets.cascadenet import CascadeNet, cascade_loss
 from utils.cascade_metrics import compute_err_metric
 from utils.warp_ops import apply_disparity_cu
 from utils.config import cfg
@@ -25,7 +25,7 @@ from utils.util import setup_logger, weights_init, \
 
 cudnn.benchmark = True
 
-parser = argparse.ArgumentParser(description='CycleGAN with Cascade Stereo Network (CasStereoNet)')
+parser = argparse.ArgumentParser(description='CycleGAN with Pyramid Stereo Network (PSMNet)')
 parser.add_argument('--config-file', type=str, default='./configs/local_train_steps.yaml',
                     metavar='FILE', help='Config files')
 parser.add_argument('--summary-freq', type=int, default=500, help='Frequency of saving temporary results')
@@ -39,7 +39,6 @@ parser.add_argument('--loss-ratio', type=float, default=0.05, help='Ratio betwee
 
 args = parser.parse_args()
 cfg.merge_from_file(args.config_file)
-num_stage = len([int(nd) for nd in cfg.ARGS.NDISP])     # number of stages in cascade network
 
 # Set random seed to make sure networks in different processes are same
 set_random_seed(args.seed)
@@ -58,20 +57,22 @@ cuda_device = torch.device("cuda:{}".format(args.local_rank))
 os.makedirs(args.logdir, exist_ok=True)
 os.makedirs(os.path.join(args.logdir, 'models'), exist_ok=True)
 summary_writer = tensorboardX.SummaryWriter(logdir=args.logdir)
-logger = setup_logger("CycleGAN cascade stereo", distributed_rank=args.local_rank, save_dir=args.logdir)
+logger = setup_logger("CycleGAN PSMNet", distributed_rank=args.local_rank, save_dir=args.logdir)
 logger.info(f'Loaded config file: \'{args.config_file}\'')
 logger.info(f'Running with configs:\n{cfg}')
 logger.info(f'Running with {num_gpus} GPUs')
 
-# python -m torch.distributed.launch train_cycleGAN_cascade.py --config-file configs/remote_train_steps.yaml --logdir ../train_9_14_cyclegan_cascade_new_order/debug --debug --summary-freq 20 --loss-ratio 1
+# python -m torch.distributed.launch train_cycleGAN_psmnet.py --summary-freq 1 --save-freq 1 --logdir ../train_9_7_cyclegan_psmnet/debug --debug
+# python -m torch.distributed.launch train_cycleGAN_psmnet.py --config-file configs/remote_train_steps.yaml --summary-freq 10 --save-freq 100 --logdir ../train_9_7_cyclegan_psmnet/debug --debug
 
-def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoader):
+
+def train(gan_model, psmnet_model, psmnet_optimizer, TrainImgLoader, ValImgLoader):
     cur_err = np.inf    # store best result
 
     for epoch_idx in range(cfg.SOLVER.EPOCHS):
         # One epoch training loop
         avg_train_scalars_gan = AverageMeterDict()
-        avg_train_scalars_cascade = AverageMeterDict()
+        avg_train_scalars_psmnet = AverageMeterDict()
         for batch_idx, sample in enumerate(TrainImgLoader):
             global_step = (len(TrainImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE
             if global_step > cfg.SOLVER.STEPS:
@@ -80,18 +81,18 @@ def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoa
             # Adjust learning rate
             adjust_learning_rate(gan_model.optimizer_G, global_step, cfg.SOLVER.LR_G, cfg.SOLVER.LR_STEPS)
             adjust_learning_rate(gan_model.optimizer_D, global_step, cfg.SOLVER.LR_D, cfg.SOLVER.LR_STEPS)
-            adjust_learning_rate(cascade_optimizer, global_step, cfg.SOLVER.LR_CASCADE, cfg.SOLVER.LR_STEPS)
+            adjust_learning_rate(psmnet_optimizer, global_step, cfg.SOLVER.LR_CASCADE, cfg.SOLVER.LR_STEPS)
 
             do_summary = global_step % args.summary_freq == 0
             # Train one sample
-            scalar_outputs_gan, scalar_outputs_cascade, img_outputs_gan, img_outputs_cascade = \
-                train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=True)
+            scalar_outputs_gan, scalar_outputs_psmnet, img_outputs_gan, img_outputs_psmnet = \
+                train_sample(sample, gan_model, psmnet_model, psmnet_optimizer, isTrain=True)
             # Save result to tensorboard
             if (not is_distributed) or (dist.get_rank() == 0):
                 scalar_outputs_gan = tensor2float(scalar_outputs_gan)
-                scalar_outputs_cascade = tensor2float(scalar_outputs_cascade)
+                scalar_outputs_psmnet = tensor2float(scalar_outputs_psmnet)
                 avg_train_scalars_gan.update(scalar_outputs_gan)
-                avg_train_scalars_cascade.update(scalar_outputs_cascade)
+                avg_train_scalars_psmnet.update(scalar_outputs_psmnet)
                 if do_summary:
                     # Update GAN images
                     save_images_grid(summary_writer, 'train_gan', img_outputs_gan, global_step)
@@ -99,11 +100,11 @@ def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoa
                     scalar_outputs_gan.update({'lr_G': gan_model.optimizer_G.param_groups[0]['lr']})
                     scalar_outputs_gan.update({'lr_D': gan_model.optimizer_D.param_groups[0]['lr']})
                     save_scalars_graph(summary_writer, 'train_gan', scalar_outputs_gan, global_step)
-                    # Update Cascade images
-                    save_images(summary_writer, 'train_cascade', img_outputs_cascade, global_step)
-                    # Update Cascade losses
-                    scalar_outputs_cascade.update({'lr': cascade_optimizer.param_groups[0]['lr']})
-                    save_scalars(summary_writer, 'train_cascade', scalar_outputs_cascade, global_step)
+                    # Update PSMNet images
+                    save_images(summary_writer, 'train_psmnet', img_outputs_psmnet, global_step)
+                    # Update PSMNet losses
+                    scalar_outputs_psmnet.update({'lr': psmnet_optimizer.param_groups[0]['lr']})
+                    save_scalars(summary_writer, 'train_psmnet', scalar_outputs_psmnet, global_step)
 
                 # Save checkpoints
                 if (global_step + 1) % args.save_freq == 0:
@@ -113,54 +114,53 @@ def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoa
                         'G_B': gan_model.netG_B.state_dict(),
                         'D_A': gan_model.netD_A.state_dict(),
                         'D_B': gan_model.netD_B.state_dict(),
-                        'Cascade': cascade_model.state_dict(),
+                        'PSMNet': psmnet_model.state_dict(),
                         'optimizerG': gan_model.optimizer_G.state_dict(),
                         'optimizerD': gan_model.optimizer_D.state_dict(),
-                        'optimizerCascade': cascade_optimizer.state_dict()
+                        'optimizerPSMNet': psmnet_optimizer.state_dict()
                     }
                     save_filename = os.path.join(args.logdir, 'models', f'model_{global_step}.pth')
                     torch.save(checkpoint_data, save_filename)
 
                     # Get average results among all batches
                     total_err_metric_gan = avg_train_scalars_gan.mean()
-                    total_err_metric_cascade = avg_train_scalars_cascade.mean()
-                    logger.info(f'Epoch {global_step} train gan    : {total_err_metric_gan}')
-                    logger.info(f'Epoch {global_step} train cascade: {total_err_metric_cascade}')
-
+                    total_err_metric_psmnet = avg_train_scalars_psmnet.mean()
+                    logger.info(f'Step {global_step} train gan    : {total_err_metric_gan}')
+                    logger.info(f'Step {global_step} train cascade: {total_err_metric_psmnet}')
         gc.collect()
 
         # One epoch validation loop
         avg_val_scalars_gan = AverageMeterDict()
-        avg_val_scalars_cascade = AverageMeterDict()
+        avg_val_scalars_psmnet = AverageMeterDict()
         for batch_idx, sample in enumerate(ValImgLoader):
             global_step = (len(ValImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE
             do_summary = global_step % args.summary_freq == 0
-            scalar_outputs_gan, scalar_outputs_cascade, img_outputs_gan, img_outputs_cascade = \
-                train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=False)
+            scalar_outputs_gan, scalar_outputs_psmnet, img_outputs_gan, img_outputs_psmnet = \
+                train_sample(sample, gan_model, psmnet_model, psmnet_optimizer, isTrain=False)
             if (not is_distributed) or (dist.get_rank() == 0):
                 scalar_outputs_gan = tensor2float(scalar_outputs_gan)
-                scalar_outputs_cascade = tensor2float(scalar_outputs_cascade)
+                scalar_outputs_psmnet = tensor2float(scalar_outputs_psmnet)
                 avg_val_scalars_gan.update(scalar_outputs_gan)
-                avg_val_scalars_cascade.update(scalar_outputs_cascade)
+                avg_val_scalars_psmnet.update(scalar_outputs_psmnet)
                 if do_summary:
                     save_images_grid(summary_writer, 'val_gan', img_outputs_gan, global_step)
                     scalar_outputs_gan.update({'lr_G': gan_model.optimizer_G.param_groups[0]['lr']})
                     scalar_outputs_gan.update({'lr_D': gan_model.optimizer_D.param_groups[0]['lr']})
                     save_scalars_graph(summary_writer, 'val_gan', scalar_outputs_gan, global_step)
-                    save_images(summary_writer, 'val_cascade', img_outputs_cascade, global_step)
-                    scalar_outputs_cascade.update({'lr': cascade_optimizer.param_groups[0]['lr']})
-                    save_scalars(summary_writer, 'val_cascade', scalar_outputs_cascade, global_step)
+                    save_images(summary_writer, 'val_psmnet', img_outputs_psmnet, global_step)
+                    scalar_outputs_psmnet.update({'lr': psmnet_optimizer.param_groups[0]['lr']})
+                    save_scalars(summary_writer, 'val_psmnet', scalar_outputs_psmnet, global_step)
 
         if (not is_distributed) or (dist.get_rank() == 0):
             # Get average results among all batches
             total_err_metric_gan = avg_val_scalars_gan.mean()
-            total_err_metric_cascade = avg_val_scalars_cascade.mean()
+            total_err_metric_psmnet = avg_val_scalars_psmnet.mean()
             logger.info(f'Epoch {epoch_idx} val   gan    : {total_err_metric_gan}')
-            logger.info(f'Epoch {epoch_idx} val   cascade: {total_err_metric_cascade}')
+            logger.info(f'Epoch {epoch_idx} val   psmnet : {total_err_metric_psmnet}')
 
             # Save best checkpoints
-            new_err = total_err_metric_cascade['depth_abs_err'][0] if num_gpus > 1 \
-                else total_err_metric_cascade['depth_abs_err']
+            new_err = total_err_metric_psmnet['depth_abs_err'][0] if num_gpus > 1 \
+                else total_err_metric_psmnet['depth_abs_err']
             if new_err < cur_err:
                 cur_err = new_err
                 checkpoint_data = {
@@ -169,23 +169,23 @@ def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoa
                     'G_B': gan_model.netG_B.state_dict(),
                     'D_A': gan_model.netD_A.state_dict(),
                     'D_B': gan_model.netD_B.state_dict(),
-                    'Cascade': cascade_model.state_dict(),
+                    'PSMNet': psmnet_model.state_dict(),
                     'optimizerG': gan_model.optimizer_G.state_dict(),
                     'optimizerD': gan_model.optimizer_D.state_dict(),
-                    'optimizerCascade': cascade_optimizer.state_dict()
+                    'optimizerPSMNet': psmnet_optimizer.state_dict()
                 }
                 save_filename = os.path.join(args.logdir, 'models', f'model_best.pth')
                 torch.save(checkpoint_data, save_filename)
         gc.collect()
 
 
-def train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=True):
+def train_sample(sample, gan_model, psmnet_model, psmnet_optimizer, isTrain=True):
     if isTrain:
         gan_model.train()
-        cascade_model.train()
+        psmnet_model.train()
     else:
         gan_model.eval()
-        cascade_model.eval()
+        psmnet_model.eval()
 
     # Train on GAN
     img_L = sample['img_L'].to(cuda_device)  # [bs, 1, H, W]
@@ -210,7 +210,7 @@ def train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=Tr
     img_baseline = sample['baseline'].to(cuda_device)
 
     # Resize the 2x resolution disp and depth back to H * W
-    # Note: This step should go before the apply_disparity_cu
+    # Note this should go before apply_disparity_cu
     disp_gt = F.interpolate(disp_gt, scale_factor=0.5, mode='nearest',
                              recompute_scale_factor=False)  # [bs, 1, H, W]
     depth_gt = F.interpolate(depth_gt, scale_factor=0.5, mode='nearest',
@@ -222,33 +222,32 @@ def train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=Tr
                                    recompute_scale_factor=False)
         disp_gt = apply_disparity_cu(img_disp_r, img_disp_r.type(torch.int))  # [bs, 1, H, W]
         del img_disp_r
-    disp_gt = disp_gt.squeeze(0)  # [bs, H, W]
 
     mask = (disp_gt < cfg.ARGS.MAX_DISP) * (disp_gt > 0)  # Note in training we do not exclude bg
     if isTrain:
-        outputs = cascade_model(img_L, img_R)
-        loss_cascade = cascade_loss(outputs, disp_gt, mask, dlossw=[float(e) for e in cfg.ARGS.DLOSSW])
+        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_L, img_R)
+        pred_disp = pred_disp3
+        loss_psmnet = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
+               + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
+               + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
     else:
         with torch.no_grad():
-            outputs = cascade_model(img_L, img_R)
-            loss_cascade = torch.tensor(0, dtype=img_L.dtype, device=cuda_device, requires_grad=False)
-    outputs_stage = outputs["stage{}".format(num_stage)]
-    disp_pred = outputs_stage['pred']  # [bs, H, W]
-    del outputs
+            pred_disp = psmnet_model(img_L, img_R)
+            loss_psmnet = F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
 
     # Backward and optimization
     if isTrain:
         # update Ds
         gan_model.update_D()
         # Update Gs
-        total_loss = gan_model.compute_loss_G() + loss_cascade * args.loss_ratio # loss_G + loss_cascade (task loss)
+        total_loss = gan_model.compute_loss_G() + loss_psmnet * args.loss_ratio # loss_G + loss_psmnet (task loss)
         # Ds require no gradient when optimizing Gs
         gan_model.set_requires_grad([gan_model.netD_A, gan_model.netD_B], False)
         gan_model.optimizer_G.zero_grad()   # set Gs' gradient to zero
-        cascade_optimizer.zero_grad()           # set cascade gradient to zero
+        psmnet_optimizer.zero_grad()           # set cascade gradient to zero
         total_loss.backward()                   # calculate gradient
         gan_model.optimizer_G.step()            # update Gs weights
-        cascade_optimizer.step()                # update cascade weights
+        psmnet_optimizer.step()                # update cascade weights
     else:
         gan_model.compute_loss_G()
         gan_model.compute_loss_D_A()
@@ -274,27 +273,27 @@ def train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=Tr
     }
 
     # Compute cascade error metrics
-    scalar_outputs_cascade = {'loss': loss_cascade.item()}
-    err_metrics = compute_err_metric(disp_gt.unsqueeze(1),
+    scalar_outputs_psmnet = {'loss': loss_psmnet.item()}
+    err_metrics = compute_err_metric(disp_gt,
                                      depth_gt,
-                                     disp_pred.unsqueeze(1),
+                                     pred_disp,
                                      img_focal_length,
                                      img_baseline,
-                                     mask.unsqueeze(1))
-    scalar_outputs_cascade.update(err_metrics)
+                                     mask)
+    scalar_outputs_psmnet.update(err_metrics)
     # Compute error images
-    pred_disp_err_np = disp_error_img(disp_pred.unsqueeze(1), disp_gt.unsqueeze(1), mask.unsqueeze(1))
+    pred_disp_err_np = disp_error_img(pred_disp[[0]], disp_gt[[0]], mask[[0]])
     pred_disp_err_tensor = torch.from_numpy(np.ascontiguousarray(pred_disp_err_np[None].transpose([0, 3, 1, 2])))
-    img_outputs_cascade = {
-        'disp_gt': disp_gt.unsqueeze(1).repeat([1, 3, 1, 1]),
-        'disp_pred': disp_pred.unsqueeze(1).repeat([1, 3, 1, 1]),
+    img_outputs_psmnet = {
+        'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
+        'disp_pred': pred_disp[[0]].repeat([1, 3, 1, 1]),
         'disp_err': pred_disp_err_tensor
     }
 
     if is_distributed:
         scalar_outputs_gan = reduce_scalar_outputs(scalar_outputs_gan, cuda_device)
-        scalar_outputs_cascade = reduce_scalar_outputs(scalar_outputs_cascade, cuda_device)
-    return scalar_outputs_gan, scalar_outputs_cascade, img_outputs_gan, img_outputs_cascade
+        scalar_outputs_psmnet = reduce_scalar_outputs(scalar_outputs_psmnet, cuda_device)
+    return scalar_outputs_gan, scalar_outputs_psmnet, img_outputs_gan, img_outputs_psmnet
 
 
 if __name__ == '__main__':
@@ -323,22 +322,14 @@ if __name__ == '__main__':
     gan_model.set_device(cuda_device)
     gan_model.set_distributed(is_distributed=is_distributed, local_rank=args.local_rank)
 
-    # Create Cascade model
-    cascade_model = CascadeNet(
-        maxdisp=cfg.ARGS.MAX_DISP,
-        ndisps=[int(nd) for nd in cfg.ARGS.NDISP],
-        disp_interval_pixel=[float(d_i) for d_i in cfg.ARGS.DISP_INTER_R],
-        cr_base_chs=[int(ch) for ch in cfg.ARGS.CR_BASE_CHS],
-        grad_method=cfg.ARGS.GRAD_METHOD,
-        using_ns=cfg.ARGS.USING_NS,
-        ns_size=cfg.ARGS.NS_SIZE
-    ).to(cuda_device)
-    cascade_optimizer = torch.optim.Adam(cascade_model.parameters(), lr=cfg.SOLVER.LR_CASCADE, betas=(0.9, 0.999))
+    # Create PSMNet model
+    psmnet_model = PSMNet(maxdisp=cfg.ARGS.MAX_DISP).to(cuda_device)
+    psmnet_optimizer = torch.optim.Adam(psmnet_model.parameters(), lr=cfg.SOLVER.LR_CASCADE, betas=(0.9, 0.999))
     if is_distributed:
-        cascade_model = torch.nn.parallel.DistributedDataParallel(
-            cascade_model, device_ids=[args.local_rank], output_device=args.local_rank)
+        psmnet_model = torch.nn.parallel.DistributedDataParallel(
+            psmnet_model, device_ids=[args.local_rank], output_device=args.local_rank)
     else:
-        cascade_model = torch.nn.DataParallel(cascade_model)
+        psmnet_model = torch.nn.DataParallel(psmnet_model)
 
     # Start training
-    train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoader)
+    train(gan_model, psmnet_model, psmnet_optimizer, TrainImgLoader, ValImgLoader)

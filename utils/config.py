@@ -20,10 +20,14 @@ _C.SPLIT.OBJ_NUM = 18  # Note: table + ground - 17th
 
 _C.SPLIT.LEFT = '0128_irL_denoised_half.png'
 _C.SPLIT.RIGHT = '0128_irR_denoised_half.png'
+_C.SPLIT.DEPTH = 'depth.png'
 _C.SPLIT.DEPTHL = 'depthL.png'
 _C.SPLIT.DEPTHR = 'depthR.png'
 _C.SPLIT.META = 'meta.pkl'
 _C.SPLIT.LABEL = 'irL_label_image.png'
+
+_C.SPLIT.SIM_REALSENSE = '0128_depth_denoised.png'
+_C.SPLIT.REAL_REALSENSE = '1024_depth_real.png'
 
 # Configuration for testing on real dataset
 _C.REAL = CN()

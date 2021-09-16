@@ -62,11 +62,11 @@ class hourglass(nn.Module):
 
 
 class PSMNet(nn.Module):
-    def __init__(self, maxdisp=192):
+    def __init__(self, maxdisp):
         super(PSMNet, self).__init__()
         self.maxdisp = maxdisp
 
-        self.feature_extraction = FeatureExtraction()
+        # self.feature_extraction = FeatureExtraction()
 
         self.dres0 = nn.Sequential(
             convbn_3d(64, 32, 3, 1, 1),
@@ -104,25 +104,28 @@ class PSMNet(nn.Module):
         #     if type(m) == (nn.Conv2d or nn.Conv3d or nn.Linear) :
         #         torch.nn.init.xavier_uniform_(m.weight)
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, nn.Conv3d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.kernel_size[2] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-            elif isinstance(m, nn.BatchNorm3d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-            elif isinstance(m, nn.Linear):
-                m.bias.data.zero_()
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+        #         m.weight.data.normal_(0, math.sqrt(2. / n))
+        #     elif isinstance(m, nn.Conv3d):
+        #         n = m.kernel_size[0] * m.kernel_size[1] * m.kernel_size[2] * m.out_channels
+        #         m.weight.data.normal_(0, math.sqrt(2. / n))
+        #     elif isinstance(m, nn.BatchNorm2d):
+        #         m.weight.data.fill_(1)
+        #         m.bias.data.zero_()
+        #     elif isinstance(m, nn.BatchNorm3d):
+        #         m.weight.data.fill_(1)
+        #         m.bias.data.zero_()
+        #     elif isinstance(m, nn.Linear):
+        #         m.bias.data.zero_()
 
-    def forward(self, img_L, img_R):
-        refimg_feature = self.feature_extraction(img_L)  # [bs, 32, H/4, W/4]
-        targetimg_feature = self.feature_extraction(img_R)
+    def forward(self, img_L_feature, img_R_feature):
+        # refimg_feature = self.feature_extraction(img_L)  # [bs, 32, H/4, W/4]
+        # targetimg_feature = self.feature_extraction(img_R)
+
+        refimg_feature = img_L_feature
+        targetimg_feature = img_R_feature
 
         # Cost Volume
         [bs, feature_size, H, W] = refimg_feature.size()
@@ -186,8 +189,15 @@ class PSMNet(nn.Module):
 if __name__ == '__main__':
     # Test PSMNet
     model = PSMNet(maxdisp=192).cuda()
-    model.eval()
-    img_L = torch.rand(1, 3, 256, 512).cuda()
-    img_R = torch.rand(1, 3, 256, 512).cuda()
-    pred = model(img_L, img_R)
+    model.train()
+    img_disp = torch.rand(1, 1, 256, 512).cuda()
+    img_L_feature = torch.rand(1, 32, 64, 128).cuda()
+    img_L_feature.requires_grad = True
+    img_R_feature = torch.rand(1, 32, 64, 128).cuda()
+    img_R_feature.requires_grad = True
+    _, _, pred = model(img_L_feature, img_R_feature)
     print(f'pred shape {pred.shape}')   # pred shape torch.Size([1, 1, 256, 512])
+
+    loss = F.smooth_l1_loss(pred, img_disp, reduction='mean')
+    loss.backward()
+    print(f'Loss {loss.item()}')

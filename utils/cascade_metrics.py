@@ -13,7 +13,7 @@ from utils.reduce import make_nograd_func
 # Error metric for messy-table-dataset
 # TODO: Ignore instances with small mask? (@compute_metric_for_each_image)
 @make_nograd_func
-def compute_err_metric(disp_gt, depth_gt, disp_pred, focal_length, baseline, mask):
+def compute_err_metric(disp_gt, depth_gt, disp_pred, focal_length, baseline, mask, depth_pred=None):
     """
     Compute the error metrics for predicted disparity map
     :param disp_gt: GT disparity map, [bs, 1, H, W]
@@ -30,7 +30,8 @@ def compute_err_metric(disp_gt, depth_gt, disp_pred, focal_length, baseline, mas
     bad2 = disp_diff[disp_diff > 2].numel() / disp_diff.numel()
 
     # get predicted depth map
-    depth_pred = focal_length * baseline / disp_pred  # in meters
+    if depth_pred is None:
+        depth_pred = focal_length * baseline / disp_pred  # in meters
     depth_abs_err = F.l1_loss(depth_pred[mask] * 1000, depth_gt[mask] * 1000, reduction='mean').item()
     depth_diff = torch.abs(depth_gt[mask] - depth_pred[mask])  # [bs, 1, H, W]
     depth_err2 = depth_diff[depth_diff > 2e-3].numel() / depth_diff.numel()
@@ -76,10 +77,12 @@ def compute_obj_err(disp_gt, depth_gt, disp_pred, focal_length, baseline, label,
     total_obj_count = np.zeros(obj_total_num)
 
     for i in range(obj_num):
-        obj_id = obj_list[i]
+        obj_id = int(obj_list[i].item())
         obj_mask = label == obj_id
-        obj_disp_err = F.l1_loss(disp_gt[obj_mask], disp_pred[obj_mask], reduction='mean').item()
-        obj_depth_err = F.l1_loss(depth_gt[obj_mask] * 1000, depth_pred[obj_mask] * 1000, reduction='mean').item()
+        obj_disp_err = F.l1_loss(disp_gt[obj_mask * mask], disp_pred[obj_mask * mask],
+                                 reduction='mean').item()
+        obj_depth_err = F.l1_loss(depth_gt[obj_mask * mask] * 1000, depth_pred[obj_mask * mask] * 1000,
+                                  reduction='mean').item()
         total_obj_disp_err[obj_id] += obj_disp_err
         total_obj_depth_err[obj_id] += obj_depth_err
         total_obj_count[obj_id] += 1

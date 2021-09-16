@@ -209,7 +209,6 @@ class CycleGANModel:
             net.eval()
 
 
-
 if __name__ == '__main__':
     h, w = 256, 512
     img_L = torch.rand(1, 1, h, w).cuda()

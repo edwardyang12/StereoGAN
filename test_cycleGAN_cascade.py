@@ -19,7 +19,7 @@ from utils.util import get_time_string, setup_logger, depth_error_img, disp_erro
 from utils.test_util import load_from_dataparallel_model, save_img, save_gan_img, save_obj_err_file
 from utils.warp_ops import apply_disparity_cu
 
-parser = argparse.ArgumentParser(description='Testing for Cascade-Stereo on messy-table-dataset')
+parser = argparse.ArgumentParser(description='Testing for CycleGAN Cascade-Stereo on messy-table-dataset')
 parser.add_argument('--config-file', type=str, default='./configs/local_test.yaml',
                     metavar='FILE', help='Config files')
 parser.add_argument('--model', type=str, default='', metavar='FILE', help='Path to test model')
@@ -31,6 +31,7 @@ parser.add_argument('--onreal', action='store_true', default=False, help='Test o
 parser.add_argument('--analyze-objects', action='store_true', default=True, help='Analyze on different objects')
 parser.add_argument('--exclude-bg', action='store_true', default=False, help='Exclude background when testing')
 parser.add_argument('--warp-op', action='store_true', default=True, help='Use warp_op function to get disparity')
+parser.add_argument('--exclude-zeros', action='store_true', default=False, help='Whether exclude zero pixels in realsense')
 parser.add_argument("--local_rank", type=int, default=0, help='Rank of device in distributed training')
 args = parser.parse_args()
 cfg.merge_from_file(args.config_file)
@@ -39,8 +40,8 @@ cuda_device = torch.device("cuda:{}".format(args.local_rank))
 if args.gan_model == '':
     args.gan_model = args.model
 
-# python test_cycleGAN_cascade.py --model /code/models/model_4.pth --onreal --exclude-bg
-# python test_cycleGAN_cascade.py --config-file configs/remote_test.yaml --model ../train_8_14_cascade/train1/models/model_best.pth --onreal --exclude-bg --debug
+# python test_cycleGAN_cascade.py --model /code/models/model_4.pth --onreal --exclude-bg --exclude-zeros
+# python test_cycleGAN_cascade.py --config-file configs/remote_test.yaml --model ../train_8_14_cascade/train1/models/model_best.pth --onreal --exclude-bg --debug --gan-model
 
 
 def test(gan_model, cascade_model, val_loader, logger, log_dir):
@@ -65,15 +66,29 @@ def test(gan_model, cascade_model, val_loader, logger, log_dir):
 
         img_disp_l = data['img_disp_l'].cuda()
         img_depth_l = data['img_depth_l'].cuda()
+        img_depth_realsense = data['img_depth_realsense'].cuda()
         img_label = data['img_label'].cuda()
         img_focal_length = data['focal_length'].cuda()
         img_baseline = data['baseline'].cuda()
         prefix = data['prefix'][0]
 
+        img_disp_l = F.interpolate(img_disp_l, (540, 960), mode='nearest',
+                             recompute_scale_factor=False)
+        img_depth_l = F.interpolate(img_depth_l, (540, 960), mode='nearest',
+                             recompute_scale_factor=False)
+        img_depth_realsense = F.interpolate(img_depth_realsense, (540, 960), mode='nearest',
+                             recompute_scale_factor=False)
+        img_label = F.interpolate(img_label, (540, 960), mode='nearest',
+                             recompute_scale_factor=False).type(torch.int)
+
         # If using warp_op, computing img_disp_l from img_disp_r
         if args.warp_op:
             img_disp_r = data['img_disp_r'].cuda()
             img_depth_r = data['img_depth_r'].cuda()
+            img_disp_r = F.interpolate(img_disp_r, (540, 960), mode='nearest',
+                                       recompute_scale_factor=False)
+            img_depth_r = F.interpolate(img_depth_r, (540, 960), mode='nearest',
+                                        recompute_scale_factor=False)
             img_disp_l = apply_disparity_cu(img_disp_r, img_disp_r.type(torch.int))
             img_depth_l = apply_disparity_cu(img_depth_r, img_disp_r.type(torch.int))  # [bs, 1, H, W]
 
@@ -111,13 +126,6 @@ def test(gan_model, cascade_model, val_loader, logger, log_dir):
             }
             save_gan_img(img_outputs, os.path.join(log_dir, 'gan', f'{prefix}.png'))
 
-        img_disp_l = F.interpolate(img_disp_l, (540, 960), mode='nearest',
-                             recompute_scale_factor=False)
-        img_depth_l = F.interpolate(img_depth_l, (540, 960), mode='nearest',
-                             recompute_scale_factor=False)
-        img_label = F.interpolate(img_label, (540, 960), mode='nearest',
-                             recompute_scale_factor=False).type(torch.int)
-
         # Pad the imput image and depth disp image to 960 * 544
         right_pad = cfg.REAL.PAD_WIDTH - 960
         top_pad = cfg.REAL.PAD_HEIGHT - 540
@@ -130,8 +138,12 @@ def test(gan_model, cascade_model, val_loader, logger, log_dir):
             mask = (img_disp_l < cfg.ARGS.MAX_DISP) * (img_disp_l > 0) * img_ground_mask
         else:
             mask = (img_disp_l < cfg.ARGS.MAX_DISP) * (img_disp_l > 0)
+
+        # Exclude uncertain pixel from realsense_depth_pred
+        realsense_zeros_mask = img_depth_realsense > 0
+        if args.exclude_zeros:
+            mask = mask * realsense_zeros_mask
         mask = mask.type(torch.bool)
-        mask.detach_()  # [bs, 1, H, W]
 
         ground_mask = torch.logical_not(mask).squeeze(0).squeeze(0).detach().cpu().numpy()
 

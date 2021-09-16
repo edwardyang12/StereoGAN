@@ -1,7 +1,8 @@
 """
-Author: Isabella Liu 8/14/21
-Feature: Train cycle GAN on messytable dataset
+Author: Isabella Liu 8/23/21
+Feature: Train simple DA on messytable dataset
 """
+
 import gc
 import os
 import argparse
@@ -13,7 +14,7 @@ import torch.distributed as dist
 import torch.nn.functional as F
 
 from datasets.messytable import MessytableDataset
-from nets.cycle_gan import CycleGANModel
+from nets.simple_da import SimpleDA
 from utils.config import cfg
 from utils.reduce import set_random_seed, synchronize, AverageMeterDict, \
     tensor2float, tensor2numpy, reduce_scalar_outputs, make_nograd_func
@@ -35,7 +36,7 @@ parser.add_argument('--debug', action='store_true', help='Whether run in debug m
 
 args = parser.parse_args()
 cfg.merge_from_file(args.config_file)
-num_stage = len([int(nd) for nd in cfg.ARGS.NDISP])     # number of stages in cascade network
+num_stage = len([int(nd) for nd in cfg.ARGS.NDISP])  # number of stages in cascade network
 
 # Set random seed to make sure networks in different processes are same
 set_random_seed(args.seed)
@@ -46,7 +47,7 @@ is_distributed = num_gpus > 1
 args.is_distributed = is_distributed
 if is_distributed:
     torch.cuda.set_device(args.local_rank)
-    torch.distributed.init_process_group( backend="nccl", init_method="env://")
+    torch.distributed.init_process_group(backend="nccl", init_method="env://")
     synchronize()
 cuda_device = torch.device("cuda:{}".format(args.local_rank))
 
@@ -59,11 +60,12 @@ logger.info(f'Loaded config file: \'{args.config_file}\'')
 logger.info(f'Running with configs:\n{cfg}')
 logger.info(f'Running with {num_gpus} GPUs')
 
-# python -m torch.distributed.launch train_cycleGAN.py --config-file configs/remote_train_gan.yaml --summary-freq 32 --logdir ../train_8_16/debug --debug
+
+# python -m torch.distributed.launch train_simpleDA.py --config-file configs/remote_train_gan.yaml --summary-freq 32 --logdir ../train_8_23_da/debug --debug
 
 
 def train(model, TrainImgLoader, ValImgLoader):
-    cur_err = np.inf    # store best result
+    cur_err = np.inf  # store best result
 
     for epoch_idx in range(cfg.SOLVER.EPOCHS):
         # One epoch training loop
@@ -74,30 +76,25 @@ def train(model, TrainImgLoader, ValImgLoader):
                 break
 
             # Adjust learning rate
-            adjust_learning_rate(model.optimizer_G, global_step, cfg.SOLVER.LR_G, cfg.SOLVER.LR_STEPS)
-            adjust_learning_rate(model.optimizer_D, global_step, cfg.SOLVER.LR_D, cfg.SOLVER.LR_STEPS)
+            adjust_learning_rate(model.optimizer, global_step, cfg.SOLVER.LR_G, cfg.SOLVER.LR_STEPS)
 
             do_summary = global_step % args.summary_freq == 0
-            scalar_outputs, img_outputs = train_GAN_sample(sample, model)
+            scalar_outputs, img_outputs = train_DA_sample(sample, model)
             if (not is_distributed) or (dist.get_rank() == 0):
                 scalar_outputs = tensor2float(scalar_outputs)
                 avg_train_scalars.update(scalar_outputs)
                 if do_summary:
                     save_images_grid(summary_writer, 'train', img_outputs, global_step)
                     save_scalars_graph(summary_writer, 'train', scalar_outputs, global_step)
-                    summary_writer.add_scalar('train/lr_G', model.optimizer_G.param_groups[0]['lr'], global_step)
-                    summary_writer.add_scalar('train/lr_D', model.optimizer_D.param_groups[0]['lr'], global_step)
+                    summary_writer.add_scalar('train/lr', model.optimizer.param_groups[0]['lr'], global_step)
 
                 # Save checkpoints
                 if (global_step + 1) % args.save_freq == 0:
                     checkpoint_data = {
                         'epoch': epoch_idx,
-                        'G_A': model.netG_A.state_dict(),
-                        'G_B': model.netG_B.state_dict(),
-                        'D_A': model.netD_A.state_dict(),
-                        'D_B': model.netD_B.state_dict(),
-                        'optimizerG': model.optimizer_G.state_dict(),
-                        'optimizerD': model.optimizer_D.state_dict()
+                        'feature_extractor': model.feature_extractor.state_dict(),
+                        'D': model.net_D.state_dict(),
+                        'optimizer': model.optimizer.state_dict(),
                     }
                     save_filename = os.path.join(args.logdir, 'models', f'model_{global_step}.pth')
                     torch.save(checkpoint_data, save_filename)
@@ -106,14 +103,14 @@ def train(model, TrainImgLoader, ValImgLoader):
                     total_err_metric = avg_train_scalars.mean()
                     avg_train_scalars = AverageMeterDict()
                     logger.info(f'Step {global_step} train total_err_metrics: {total_err_metric}')
-                gc.collect()
+                    gc.collect()
 
         # One epoch validation loop
         avg_val_scalars = AverageMeterDict()
         for batch_idx, sample in enumerate(ValImgLoader):
             global_step = (len(ValImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE
             do_summary = global_step % args.summary_freq == 0
-            scalar_outputs, img_outputs = test_GAN_sample(sample, model)
+            scalar_outputs, img_outputs = test_DA_sample(sample, model)
             if (not is_distributed) or (dist.get_rank() == 0):
                 scalar_outputs = tensor2float(scalar_outputs)
                 avg_val_scalars.update(scalar_outputs)
@@ -127,17 +124,14 @@ def train(model, TrainImgLoader, ValImgLoader):
             logger.info(f'Epoch {epoch_idx} val   total_err_metrics: {total_err_metric}')
 
             # Save best checkpoints
-            new_err = total_err_metric['G_A'][0]
+            new_err = total_err_metric['loss_D'] if is_distributed is False else total_err_metric['loss_D'][0]
             if new_err < cur_err:
                 cur_err = new_err
                 checkpoint_data = {
                     'epoch': epoch_idx,
-                    'G_A': model.netG_A.state_dict(),
-                    'G_B': model.netG_B.state_dict(),
-                    'D_A': model.netD_A.state_dict(),
-                    'D_B': model.netD_B.state_dict(),
-                    'optimizerG': model.optimizer_G.state_dict(),
-                    'optimizerD': model.optimizer_D.state_dict()
+                    'feature_extractor': model.feature_extractor.state_dict(),
+                    'D': model.net_D.state_dict(),
+                    'optimizer': model.optimizer.state_dict(),
                 }
                 save_filename = os.path.join(args.logdir, 'models', f'model_best.pth')
                 torch.save(checkpoint_data, save_filename)
@@ -145,7 +139,7 @@ def train(model, TrainImgLoader, ValImgLoader):
 
 
 # Train a sample batch on GAN
-def train_GAN_sample(sample, model):
+def train_DA_sample(sample, model):
     img_L = sample['img_L'].to(cuda_device)  # [bs, 1, H, W]
     img_R = sample['img_R'].to(cuda_device)  # [bs, 1, H, W]
     img_real = sample['img_real'].to(cuda_device)  # [bs, 1, 2H, 2W]
@@ -156,26 +150,35 @@ def train_GAN_sample(sample, model):
     input_sample = {'img_L': img_L, 'img_R': img_R, 'img_real': img_real}
     model.set_input(input_sample)
     model.forward()
-    model.optimize_parameters()
+    model.backward()
 
     scalar_outputs = {
-        'G_A': model.loss_G_A, 'G_B': model.loss_G_B,
-        'cycle_A': model.loss_cycle_A, 'cycle_B': model.loss_cycle_B,
-        'idt_A': model.loss_idt_A, 'idt_B': model.loss_idt_B,
-        'D_A': model.loss_D_A, 'D_B': model.loss_D_B
+        'loss_D': model.loss_D
     }
     if is_distributed:
         scalar_outputs = reduce_scalar_outputs(scalar_outputs, cuda_device)
 
     img_outputs = {
-        'img_L': {
-            'input': img_L, 'fake': model.fake_B_L, 'rec': model.rec_A_L, 'idt': model.idt_B_L
+        'img_L_input': {
+            'input': img_L
         },
-        'img_R': {
-            'input': img_R, 'fake': model.fake_B_R, 'rec': model.rec_A_R, 'idt': model.idt_B_R
+        'img_L_features': {
+            'feature_0': model.img_L_feature[:, :1, :, :], 'feature_10': model.img_L_feature[:, 10:11, :, :],
+            'feature_20': model.img_L_feature[:, 20:21, :, :]
         },
-        'img_Real': {
-            'input': img_real, 'fake': model.fake_A, 'rec': model.rec_B, 'idt': model.idt_A
+        'img_R_input': {
+            'input': img_R
+        },
+        'img_R_features': {
+            'feature_0': model.img_R_feature[:, :1, :, :], 'feature_10': model.img_R_feature[:, 10:11, :, :],
+            'feature_20': model.img_R_feature[:, 20:21, :, :]
+        },
+        'img_Real_input': {
+            'input': img_real
+        },
+        'img_Real_features': {
+            'feature_0': model.img_real_feature[:, :1, :, :], 'feature_10': model.img_real_feature[:, 10:11, :, :],
+            'feature_20': model.img_real_feature[:, 20:21, :, :]
         }
     }
     return scalar_outputs, img_outputs
@@ -183,7 +186,7 @@ def train_GAN_sample(sample, model):
 
 # Train a sample batch on GAN
 @make_nograd_func
-def test_GAN_sample(sample, model):
+def test_DA_sample(sample, model):
     img_L = sample['img_L'].to(cuda_device)  # [bs, 1, H, W]
     img_R = sample['img_R'].to(cuda_device)  # [bs, 1, H, W]
     img_real = sample['img_real'].to(cuda_device)  # [bs, 1, 2H, 2W]
@@ -196,23 +199,32 @@ def test_GAN_sample(sample, model):
     model.forward()
 
     scalar_outputs = {
-        'G_A': model.loss_G_A, 'G_B': model.loss_G_B,
-        'cycle_A': model.loss_cycle_A, 'cycle_B': model.loss_cycle_B,
-        'idt_A': model.loss_idt_A, 'idt_B': model.loss_idt_B,
-        'D_A': model.loss_D_A, 'D_B': model.loss_D_B
+        'loss_D': model.loss_D
     }
     if is_distributed:
         scalar_outputs = reduce_scalar_outputs(scalar_outputs, cuda_device)
 
     img_outputs = {
-        'img_L': {
-            'input': img_L, 'fake': model.fake_B_L, 'rec': model.rec_A_L, 'idt': model.idt_B_L
+        'img_L_input': {
+            'input': img_L
         },
-        'img_R': {
-            'input': img_R, 'fake': model.fake_B_R, 'rec': model.rec_A_R, 'idt': model.idt_B_R
+        'img_L_features': {
+            'feature_0': model.img_L_feature[:, :1, :, :], 'feature_10': model.img_L_feature[:, 10:11, :, :],
+            'feature_20': model.img_L_feature[:, 20:21, :, :]
         },
-        'img_Real': {
-            'input': img_real, 'fake': model.fake_A, 'rec': model.rec_B, 'idt': model.idt_A
+        'img_R_input': {
+            'input': img_R
+        },
+        'img_R_features': {
+            'feature_0': model.img_R_feature[:, :1, :, :], 'feature_10': model.img_R_feature[:, 10:11, :, :],
+            'feature_20': model.img_R_feature[:, 20:21, :, :]
+        },
+        'img_Real_input': {
+            'input': img_real
+        },
+        'img_Real_features': {
+            'feature_0': model.img_real_feature[:, :1, :, :], 'feature_10': model.img_real_feature[:, 10:11, :, :],
+            'feature_20': model.img_real_feature[:, 20:21, :, :]
         }
     }
     return scalar_outputs, img_outputs
@@ -240,11 +252,9 @@ if __name__ == '__main__':
                                                    shuffle=False, num_workers=cfg.SOLVER.NUM_WORKER, drop_last=False)
 
     # Create model
-    model = CycleGANModel()
+    model = SimpleDA()
     model.set_device(cuda_device)
     model.set_distributed(is_distributed=is_distributed, local_rank=args.local_rank)
 
     # Start training
     train(model, TrainImgLoader, ValImgLoader)
-
-

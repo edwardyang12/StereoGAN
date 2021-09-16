@@ -2,12 +2,12 @@
 
 # Directories
 DIR:
-  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training'  #  directory of your training dataset
+  DATASET: '/code/dataset_local_v9/training'  #  directory of your training dataset
 
 # Split files
 SPLIT:
-  TRAIN: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_train.txt'  # training lists of your training set
-  VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_val.txt'  # training lists of your validation set
+  TRAIN: '/code/dataset_local_v9/training_lists/all_train.txt'  # training lists of your training set
+  VAL: '/code/dataset_local_v9/training_lists/all_val.txt'  # training lists of your validation set
   LEFT: '0128_irL_denoised_half.png'
   RIGHT: '0128_irR_denoised_half.png'
   DEPTHL: 'depthL.png'
@@ -17,7 +17,7 @@ SPLIT:
 
 # Configuration for testing on real dataset
 REAL:
-  DATASET: '/cephfs/datasets/iccv_pnp/real_data_v9/'  # path to your real testing dataset
+  DATASET: '/code/real_dataset_local_v9'  # path to your real testing dataset
   LEFT: '1024_irL_real_1080.png'
   RIGHT: '1024_irR_real_1080.png'
 
@@ -26,10 +26,8 @@ SOLVER:
   LR_CASCADE: 0.001                         # base learning rate for cascade
   LR_G: 0.0002                              # base learning rate for G
   LR_D: 0.0002                              # base learning rate for D
-  LR_STEPS: '5000,10000,14000,18000,20000:2'    # the steps to decay lr: the downscale rate
-#  LR_STEPS: '10000,15000,20000,25000,30000:2'    # the steps to decay lr: the downscale rate
-  STEPS: 22000                              # number of steps to train
-#  STEPS: 40000                              # number of steps to train
+  LR_STEPS: '5000,6000,7000,8000,9000:2'    # the steps to decay lr: the downscale rate
+  STEPS: 10000                              # number of steps to train
   EPOCHS: 1
   BATCH_SIZE: 1                             # batch size
   NUM_WORKER: 1                               # num_worker in dataloader

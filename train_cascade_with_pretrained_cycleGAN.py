@@ -1,6 +1,6 @@
 """
 Author: Isabella Liu 8/14/21
-Feature: Train cycle GAN with cascade
+Feature: Train cascade with pre-trained cycle GAN
 """
 import gc
 import os
@@ -25,17 +25,20 @@ from utils.util import setup_logger, weights_init, \
 
 cudnn.benchmark = True
 
-parser = argparse.ArgumentParser(description='CycleGAN with Cascade Stereo Network (CasStereoNet)')
-parser.add_argument('--config-file', type=str, default='./configs/local_train_steps.yaml',
+parser = argparse.ArgumentParser(description='Simple GAN with Cascade Stereo Network (CasStereoNet)')
+parser.add_argument('--config-file', type=str, default='./configs/local_train.yaml',
                     metavar='FILE', help='Config files')
-parser.add_argument('--summary-freq', type=int, default=500, help='Frequency of saving temporary results')
-parser.add_argument('--save-freq', type=int, default=1000, help='Frequency of saving checkpoint')
+parser.add_argument('--gan-model', type=str, default='', required=True,
+                    metavar='FILE', help='Path to pretrained GAN model')
+parser.add_argument('--update-g-freq', type=int, default=160, help='Frequency of updating discriminator')
+parser.add_argument('--summary-freq', type=int, default=640, help='Frequency of saving temporary results')
+parser.add_argument('--save-freq', type=int, default=1, help='Frequency of saving checkpoint')
 parser.add_argument('--logdir', required=True, help='Directory to save logs and checkpoints')
 parser.add_argument('--seed', type=int, default=1, metavar='S', help='Random seed (default: 1)')
 parser.add_argument("--local_rank", type=int, default=0, help='Rank of device in distributed training')
 parser.add_argument('--debug', action='store_true', help='Whether run in debug mode (will load less data)')
 parser.add_argument('--warp-op', action='store_true',default=True, help='whether use warp_op function to get disparity')
-parser.add_argument('--loss-ratio', type=float, default=0.05, help='Ratio between loss_G and loss_cascade')
+parser.add_argument("--cascade-step", type=int, default=2000, help='Steps to trian GAN alone')
 
 args = parser.parse_args()
 cfg.merge_from_file(args.config_file)
@@ -58,30 +61,27 @@ cuda_device = torch.device("cuda:{}".format(args.local_rank))
 os.makedirs(args.logdir, exist_ok=True)
 os.makedirs(os.path.join(args.logdir, 'models'), exist_ok=True)
 summary_writer = tensorboardX.SummaryWriter(logdir=args.logdir)
-logger = setup_logger("CycleGAN cascade stereo", distributed_rank=args.local_rank, save_dir=args.logdir)
+logger = setup_logger("Simple GAN cascade stereo", distributed_rank=args.local_rank, save_dir=args.logdir)
 logger.info(f'Loaded config file: \'{args.config_file}\'')
 logger.info(f'Running with configs:\n{cfg}')
 logger.info(f'Running with {num_gpus} GPUs')
 
-# python -m torch.distributed.launch train_cycleGAN_cascade.py --config-file configs/remote_train_steps.yaml --logdir ../train_9_14_cyclegan_cascade_new_order/debug --debug --summary-freq 20 --loss-ratio 1
+# python -m torch.distributed.launch train_cascade_with_pretrained_cycleGAN.py --config-file configs/remote_train.yaml --summary-freq 32 --logdir ../train_8_17_cascade/debug --debug --gan-model
+
 
 def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoader):
     cur_err = np.inf    # store best result
+    gan_model.eval()    # set gan model to eval mode
 
     for epoch_idx in range(cfg.SOLVER.EPOCHS):
+        # Adjust learning rate
+        adjust_learning_rate(cascade_optimizer, epoch_idx, cfg.SOLVER.LR_CASCADE, cfg.SOLVER.LR_EPOCHS)
+
         # One epoch training loop
         avg_train_scalars_gan = AverageMeterDict()
         avg_train_scalars_cascade = AverageMeterDict()
         for batch_idx, sample in enumerate(TrainImgLoader):
             global_step = (len(TrainImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE
-            if global_step > cfg.SOLVER.STEPS:
-                break
-
-            # Adjust learning rate
-            adjust_learning_rate(gan_model.optimizer_G, global_step, cfg.SOLVER.LR_G, cfg.SOLVER.LR_STEPS)
-            adjust_learning_rate(gan_model.optimizer_D, global_step, cfg.SOLVER.LR_D, cfg.SOLVER.LR_STEPS)
-            adjust_learning_rate(cascade_optimizer, global_step, cfg.SOLVER.LR_CASCADE, cfg.SOLVER.LR_STEPS)
-
             do_summary = global_step % args.summary_freq == 0
             # Train one sample
             scalar_outputs_gan, scalar_outputs_cascade, img_outputs_gan, img_outputs_cascade = \
@@ -96,8 +96,6 @@ def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoa
                     # Update GAN images
                     save_images_grid(summary_writer, 'train_gan', img_outputs_gan, global_step)
                     # Update GAN losses
-                    scalar_outputs_gan.update({'lr_G': gan_model.optimizer_G.param_groups[0]['lr']})
-                    scalar_outputs_gan.update({'lr_D': gan_model.optimizer_D.param_groups[0]['lr']})
                     save_scalars_graph(summary_writer, 'train_gan', scalar_outputs_gan, global_step)
                     # Update Cascade images
                     save_images(summary_writer, 'train_cascade', img_outputs_cascade, global_step)
@@ -105,28 +103,28 @@ def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoa
                     scalar_outputs_cascade.update({'lr': cascade_optimizer.param_groups[0]['lr']})
                     save_scalars(summary_writer, 'train_cascade', scalar_outputs_cascade, global_step)
 
-                # Save checkpoints
-                if (global_step + 1) % args.save_freq == 0:
-                    checkpoint_data = {
-                        'epoch': epoch_idx,
-                        'G_A': gan_model.netG_A.state_dict(),
-                        'G_B': gan_model.netG_B.state_dict(),
-                        'D_A': gan_model.netD_A.state_dict(),
-                        'D_B': gan_model.netD_B.state_dict(),
-                        'Cascade': cascade_model.state_dict(),
-                        'optimizerG': gan_model.optimizer_G.state_dict(),
-                        'optimizerD': gan_model.optimizer_D.state_dict(),
-                        'optimizerCascade': cascade_optimizer.state_dict()
-                    }
-                    save_filename = os.path.join(args.logdir, 'models', f'model_{global_step}.pth')
-                    torch.save(checkpoint_data, save_filename)
+        if (not is_distributed) or (dist.get_rank() == 0):
+            # Get average results among all batches
+            total_err_metric_gan = avg_train_scalars_gan.mean()
+            total_err_metric_cascade = avg_train_scalars_cascade.mean()
+            logger.info(f'Epoch {epoch_idx} train gan    : {total_err_metric_gan}')
+            logger.info(f'Epoch {epoch_idx} train cascade: {total_err_metric_cascade}')
 
-                    # Get average results among all batches
-                    total_err_metric_gan = avg_train_scalars_gan.mean()
-                    total_err_metric_cascade = avg_train_scalars_cascade.mean()
-                    logger.info(f'Epoch {global_step} train gan    : {total_err_metric_gan}')
-                    logger.info(f'Epoch {global_step} train cascade: {total_err_metric_cascade}')
-
+            # Save checkpoints
+            if (epoch_idx + 1) % args.save_freq == 0:
+                checkpoint_data = {
+                    'epoch': epoch_idx,
+                    'G_A': gan_model.netG_A.state_dict(),
+                    'G_B': gan_model.netG_B.state_dict(),
+                    'D_A': gan_model.netD_A.state_dict(),
+                    'D_B': gan_model.netD_B.state_dict(),
+                    'Cascade': cascade_model.state_dict(),
+                    'optimizerG': gan_model.optimizer_G.state_dict(),
+                    'optimizerD': gan_model.optimizer_D.state_dict(),
+                    'optimizerCascade': cascade_optimizer.state_dict()
+                }
+                save_filename = os.path.join(args.logdir, 'models', f'model_{epoch_idx}.pth')
+                torch.save(checkpoint_data, save_filename)
         gc.collect()
 
         # One epoch validation loop
@@ -159,8 +157,7 @@ def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoa
             logger.info(f'Epoch {epoch_idx} val   cascade: {total_err_metric_cascade}')
 
             # Save best checkpoints
-            new_err = total_err_metric_cascade['depth_abs_err'][0] if num_gpus > 1 \
-                else total_err_metric_cascade['depth_abs_err']
+            new_err = total_err_metric_cascade['depth_abs_err'][0]
             if new_err < cur_err:
                 cur_err = new_err
                 checkpoint_data = {
@@ -181,13 +178,11 @@ def train(gan_model, cascade_model, cascade_optimizer, TrainImgLoader, ValImgLoa
 
 def train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=True):
     if isTrain:
-        gan_model.train()
         cascade_model.train()
     else:
-        gan_model.eval()
         cascade_model.eval()
 
-    # Train on GAN
+    # Compute img_L, img_R using GAN
     img_L = sample['img_L'].to(cuda_device)  # [bs, 1, H, W]
     img_R = sample['img_R'].to(cuda_device)  # [bs, 1, H, W]
     img_real = sample['img_real'].to(cuda_device)  # [bs, 1, 2H, 2W]
@@ -195,11 +190,8 @@ def train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=Tr
                              recompute_scale_factor=False, align_corners=False)
     input_sample = {'img_L': img_L, 'img_R': img_R, 'img_real': img_real}
     gan_model.set_input(input_sample)
-    if isTrain:
+    with torch.no_grad():
         gan_model.forward()
-    else:
-        with torch.no_grad():
-            gan_model.forward()
 
     # Train on Cascade
     img_L = gan_model.fake_B_L.to(cuda_device)    # [bs, 1, H, W]
@@ -208,21 +200,16 @@ def train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=Tr
     depth_gt = sample['img_depth_l'].to(cuda_device)  # [bs, 1, H, W]
     img_focal_length = sample['focal_length'].to(cuda_device)
     img_baseline = sample['baseline'].to(cuda_device)
-
-    # Resize the 2x resolution disp and depth back to H * W
-    # Note: This step should go before the apply_disparity_cu
-    disp_gt = F.interpolate(disp_gt, scale_factor=0.5, mode='nearest',
-                             recompute_scale_factor=False)  # [bs, 1, H, W]
-    depth_gt = F.interpolate(depth_gt, scale_factor=0.5, mode='nearest',
-                             recompute_scale_factor=False)  # [bs, 1, H, W]
-
     if args.warp_op:
         img_disp_r = sample['img_disp_r'].to(cuda_device)
-        img_disp_r = F.interpolate(img_disp_r, scale_factor=0.5, mode='nearest',
-                                   recompute_scale_factor=False)
         disp_gt = apply_disparity_cu(img_disp_r, img_disp_r.type(torch.int))  # [bs, 1, H, W]
         del img_disp_r
-    disp_gt = disp_gt.squeeze(0)  # [bs, H, W]
+    # Resize the 2x resolution disp and depth back to H * W
+    # Note: This step should go after the apply_disparity_cu
+    disp_gt = F.interpolate(disp_gt, scale_factor=0.5, mode='nearest',
+                             recompute_scale_factor=False).squeeze(1)  # [bs, H, W]
+    depth_gt = F.interpolate(depth_gt, scale_factor=0.5, mode='nearest',
+                             recompute_scale_factor=False)  # [bs, 1, H, W]
 
     mask = (disp_gt < cfg.ARGS.MAX_DISP) * (disp_gt > 0)  # Note in training we do not exclude bg
     if isTrain:
@@ -238,18 +225,10 @@ def train_sample(sample, gan_model, cascade_model, cascade_optimizer, isTrain=Tr
 
     # Backward and optimization
     if isTrain:
-        # update Ds
-        gan_model.update_D()
-        # Update Gs
-        total_loss = gan_model.compute_loss_G() + loss_cascade * args.loss_ratio # loss_G + loss_cascade (task loss)
-        # Ds require no gradient when optimizing Gs
-        gan_model.set_requires_grad([gan_model.netD_A, gan_model.netD_B], False)
-        gan_model.optimizer_G.zero_grad()   # set Gs' gradient to zero
         cascade_optimizer.zero_grad()           # set cascade gradient to zero
-        total_loss.backward()                   # calculate gradient
-        gan_model.optimizer_G.step()            # update Gs weights
+        loss_cascade.backward()                   # calculate gradient
         cascade_optimizer.step()                # update cascade weights
-    else:
+        # No backward for GAN
         gan_model.compute_loss_G()
         gan_model.compute_loss_D_A()
         gan_model.compute_loss_D_B()
@@ -322,6 +301,7 @@ if __name__ == '__main__':
     gan_model = CycleGANModel()
     gan_model.set_device(cuda_device)
     gan_model.set_distributed(is_distributed=is_distributed, local_rank=args.local_rank)
+    gan_model.load_model(args.gan_model)
 
     # Create Cascade model
     cascade_model = CascadeNet(
