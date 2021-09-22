@@ -6,22 +6,12 @@ Feature:
 import os
 import numpy as np
 from PIL import Image
-import cv2
 import torch
 from torch.utils.data import Dataset, DataLoader
 
 from utils.config import cfg
 from utils.util import load_pickle
-
-
-def calc_left_ir_depth_from_rgb(k_main, k_l, rt_main, rt_l, rgb_depth):
-    rt_lmain = rt_l @ np.linalg.inv(rt_main)
-    h, w = rgb_depth.shape
-    irl_depth = cv2.rgbd.registerDepth(k_main, k_l, None, rt_lmain, rgb_depth, (w, h), depthDilation=True)
-    irl_depth[np.isnan(irl_depth)] = 0
-    irl_depth[np.isinf(irl_depth)] = 0
-    irl_depth[irl_depth < 0] = 0
-    return irl_depth
+from utils.test_util import calc_left_ir_depth_from_rgb
 
 
 class MessytableTestDataset(Dataset):

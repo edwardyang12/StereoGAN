@@ -11,6 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 
 from utils.config import cfg
 from utils.util import load_pickle
+from utils.test_util import calc_left_ir_depth_from_rgb
 
 
 class MessytableRealSenseDataset(Dataset):
@@ -21,7 +22,7 @@ class MessytableRealSenseDataset(Dataset):
         :param sub: If debug mode is enabled, sub will be the number of data loaded
         """
         self.img_sim_realsense, self.img_real_realsense, self.img_depth, self.img_depth_l, self.img_depth_r, \
-            self.img_meta, self.img_label = self.__get_split_files__(split_file, debug=debug, sub=sub)
+        self.img_meta, self.img_label = self.__get_split_files__(split_file, debug=debug, sub=sub)
 
     @staticmethod
     def __get_split_files__(split_file, debug=False, sub=100):
@@ -71,8 +72,10 @@ class MessytableRealSenseDataset(Dataset):
         img_label = np.array(Image.open(self.img_label[idx]))
 
         # Convert depth map to disparity map
+        extrinsic = img_meta['extrinsic']
         extrinsic_l = img_meta['extrinsic_l']
         extrinsic_r = img_meta['extrinsic_r']
+        intrinsic = img_meta['intrinsic']
         intrinsic_l = img_meta['intrinsic_l']
         baseline = np.linalg.norm(extrinsic_l[:, -1] - extrinsic_r[:, -1])
         focal_length = intrinsic_l[0, 0]
@@ -86,6 +89,12 @@ class MessytableRealSenseDataset(Dataset):
         mask = img_depth > 0
         img_disp = np.zeros_like(img_depth)
         img_disp[mask] = focal_length * baseline / img_depth[mask]
+
+        # Convert realsense_depth from rgb frame to irL frame
+        img_sim_realsense = calc_left_ir_depth_from_rgb(intrinsic, intrinsic_l,
+                                                        extrinsic, extrinsic_l, img_sim_realsense)
+        img_real_realsense = calc_left_ir_depth_from_rgb(intrinsic, intrinsic_l,
+                                                         extrinsic, extrinsic_l, img_real_realsense)
 
         item = {}
         item['img_sim_realsense'] = torch.tensor(img_sim_realsense, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W]
@@ -102,7 +111,6 @@ class MessytableRealSenseDataset(Dataset):
         item['baseline'] = torch.tensor(baseline, dtype=torch.float32).unsqueeze(0).unsqueeze(0).unsqueeze(0)
 
         return item
-
 
 
 def get_realsense_loader(split_file, debug=False, sub=100):

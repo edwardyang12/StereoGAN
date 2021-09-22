@@ -26,6 +26,21 @@ def convbn(in_planes, out_planes, kernel_size, stride, pad, dilation):
     )
 
 
+def conv(in_planes, out_planes, kernel_size, stride, pad, dilation):
+    """Combination of conv2d and batchnorm2d"""
+    return nn.Sequential(
+        nn.Conv2d(
+            in_planes,
+            out_planes,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=dilation if dilation > 1 else pad,
+            dilation=dilation,
+            bias=False
+        )
+    )
+
+
 def convbn_3d(in_planes, out_planes, kernel_size, stride, pad):
     """Combination of conv3d and barchnorm3d"""
     return nn.Sequential(

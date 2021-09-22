@@ -6,6 +6,7 @@ Feature: Util functions when testing
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 import torch
 from .config import cfg
 
@@ -20,6 +21,16 @@ def load_from_dataparallel_model(model_pth, sub_model_name):
         name = k[7:]  # remove `module.`
         new_state_dict[name] = v
     return new_state_dict
+
+
+def calc_left_ir_depth_from_rgb(k_main, k_l, rt_main, rt_l, rgb_depth):
+    rt_lmain = rt_l @ np.linalg.inv(rt_main)
+    h, w = rgb_depth.shape
+    irl_depth = cv2.rgbd.registerDepth(k_main, k_l, None, rt_lmain, rgb_depth, (w, h), depthDilation=True)
+    irl_depth[np.isnan(irl_depth)] = 0
+    irl_depth[np.isinf(irl_depth)] = 0
+    irl_depth[irl_depth < 0] = 0
+    return irl_depth
 
 
 def save_img(log_dir, prefix,
@@ -76,11 +87,11 @@ def save_gan_img(img_outputs, path):
 
 
 
-def save_obj_err_file(total_obj_disp_err, total_obj_depth_err, log_dir):
-    result = np.append(total_obj_disp_err[None], total_obj_depth_err[None], axis=0).T
-    result = np.append(np.arange(cfg.SPLIT.OBJ_NUM)[:, None].astype(int), result, axis=-1)
+def save_obj_err_file(total_obj_disp_err, total_obj_depth_err, total_obj_depth_4_err, log_dir):
+    result = np.hstack((np.arange(cfg.SPLIT.OBJ_NUM)[:, None].astype(int), total_obj_disp_err[:, None],
+                        total_obj_depth_err[:, None], total_obj_depth_4_err[:, None]))
     result = result.astype('str').tolist()
-    head = [['     ', 'disp_err', 'depth_err']]
+    head = [['     ', 'disp_err', 'depth_err', 'depth_err_4']]
     result = head + result
 
     err_file = open(os.path.join(log_dir, 'obj_err.txt'), 'w')

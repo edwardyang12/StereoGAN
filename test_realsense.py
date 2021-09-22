@@ -26,12 +26,13 @@ parser.add_argument('--annotate', type=str, default='', help='Annotation to the 
 parser.add_argument('--onreal', action='store_true', default=False, help='Compute real realsense')
 parser.add_argument('--analyze-objects', action='store_true', default=True, help='Analyze on different objects')
 parser.add_argument('--exclude-bg', action='store_true', default=False, help='Exclude background when testing')
-parser.add_argument('--warp-op', action='store_true', default=False, help='Use warp_op function to get disparity')
+parser.add_argument('--warp-op', action='store_true', default=True, help='Use warp_op function to get disparity')
 parser.add_argument('--count-zeros', action='store_true', default=False, help='Whether count zeros in pred depth')
 args = parser.parse_args()
 cfg.merge_from_file(args.config_file)
 
-# python test_realsense.py --model /code/models/model_4.pth --onreal --exclude-bg
+
+# python test_realsense.py --onreal --exclude-bg
 # python test_realsense.py --config-file configs/remote_test.yaml --onreal --exclude-bg --debug
 
 
@@ -40,6 +41,7 @@ def test(val_loader, logger, log_dir):
                          'depth_abs_err': 0, 'depth_err2': 0, 'depth_err4': 0, 'depth_err8': 0}
     total_obj_disp_err = np.zeros(cfg.SPLIT.OBJ_NUM)
     total_obj_depth_err = np.zeros(cfg.SPLIT.OBJ_NUM)
+    total_obj_depth_4_err = np.zeros(cfg.SPLIT.OBJ_NUM)
     total_obj_count = np.zeros(cfg.SPLIT.OBJ_NUM)
     os.mkdir(os.path.join(log_dir, 'pred_disp'))
     os.mkdir(os.path.join(log_dir, 'gt_disp'))
@@ -54,10 +56,8 @@ def test(val_loader, logger, log_dir):
         else:
             pred_depth = data['img_sim_realsense'].cuda()
 
-        # img_disp_l = data['img_disp_l'].cuda()
-        # img_depth_l = data['img_depth_l'].cuda()
-        img_disp_l = data['img_disp'].cuda()
-        img_depth_l = data['img_depth'].cuda()
+        img_disp_l = data['img_disp_l'].cuda()
+        img_depth_l = data['img_depth_l'].cuda()
         img_label = data['img_label'].cuda()
         img_focal_length = data['focal_length'].cuda()
         img_baseline = data['baseline'].cuda()
@@ -70,7 +70,15 @@ def test(val_loader, logger, log_dir):
             img_disp_l = apply_disparity_cu(img_disp_r, img_disp_r.type(torch.int))
             img_depth_l = apply_disparity_cu(img_depth_r, img_disp_r.type(torch.int))  # [bs, 1, H, W]
 
-        #TODO all pred and gt depth are in [1080, 1920]
+        # Resize all the depths to [540, 960]
+        pred_depth = F.interpolate(pred_depth, (540, 960), mode='nearest',
+                                   recompute_scale_factor=False)
+        img_disp_l = F.interpolate(img_disp_l, (540, 960), mode='nearest',
+                                   recompute_scale_factor=False)
+        img_depth_l = F.interpolate(img_depth_l, (540, 960), mode='nearest',
+                                    recompute_scale_factor=False)
+        img_label = F.interpolate(img_label, (540, 960), mode='nearest',
+                                  recompute_scale_factor=False).type(torch.int)
 
         if args.exclude_bg:
             # Mask ground pixel to False
@@ -81,7 +89,7 @@ def test(val_loader, logger, log_dir):
         else:
             mask = (img_disp_l < cfg.ARGS.MAX_DISP) * (img_disp_l > 0) if args.count_zeros else \
                 (img_disp_l < cfg.ARGS.MAX_DISP) * (img_disp_l > 0) * (pred_depth > 0)
-        mask = mask.type(torch.bool)    # [bs, 1, H, W]
+        mask = mask.type(torch.bool)  # [bs, 1, H, W]
 
         ground_mask = torch.logical_not(mask).squeeze(0).squeeze(0).detach().cpu().numpy()
 
@@ -98,10 +106,12 @@ def test(val_loader, logger, log_dir):
         logger.info(f'Test instance {prefix} - {err_metrics}')
 
         # Get object error
-        obj_disp_err, obj_depth_err, obj_count = compute_obj_err(img_disp_l, img_depth_l, pred_disp, img_focal_length,
-                                                                 img_baseline, img_label, mask, cfg.SPLIT.OBJ_NUM)
+        obj_disp_err, obj_depth_err, \
+            obj_depth_4_err, obj_count = compute_obj_err(img_disp_l, img_depth_l, pred_disp, img_focal_length,
+                                                     img_baseline, img_label, mask, cfg.SPLIT.OBJ_NUM)
         total_obj_disp_err += obj_disp_err
         total_obj_depth_err += obj_depth_err
+        total_obj_depth_4_err += obj_depth_4_err
         total_obj_count += obj_count
 
         # Get disparity image
@@ -141,7 +151,8 @@ def test(val_loader, logger, log_dir):
     # # Save object error to csv file
     total_obj_disp_err /= total_obj_count
     total_obj_depth_err /= total_obj_count
-    save_obj_err_file(total_obj_disp_err, total_obj_depth_err, log_dir)
+    total_obj_depth_4_err /= total_obj_count
+    save_obj_err_file(total_obj_disp_err, total_obj_depth_err, total_obj_depth_4_err, log_dir)
 
     logger.info(f'Successfully saved object error to obj_err.txt')
 

@@ -74,6 +74,7 @@ def compute_obj_err(disp_gt, depth_gt, disp_pred, focal_length, baseline, label,
     # Array to store error and count for each object
     total_obj_disp_err = np.zeros(obj_total_num)
     total_obj_depth_err = np.zeros(obj_total_num)
+    total_obj_depth_4_err = np.zeros(obj_total_num)
     total_obj_count = np.zeros(obj_total_num)
 
     for i in range(obj_num):
@@ -83,8 +84,12 @@ def compute_obj_err(disp_gt, depth_gt, disp_pred, focal_length, baseline, label,
                                  reduction='mean').item()
         obj_depth_err = F.l1_loss(depth_gt[obj_mask * mask] * 1000, depth_pred[obj_mask * mask] * 1000,
                                   reduction='mean').item()
+        obj_depth_diff = torch.abs(depth_gt[obj_mask * mask] - depth_pred[obj_mask * mask])
+        obj_depth_err4 = obj_depth_diff[obj_depth_diff > 4e-3].numel() / obj_depth_diff.numel()
+
         total_obj_disp_err[obj_id] += obj_disp_err
         total_obj_depth_err[obj_id] += obj_depth_err
+        total_obj_depth_4_err[obj_id] += obj_depth_err4
         total_obj_count[obj_id] += 1
-    return total_obj_disp_err, total_obj_depth_err, total_obj_count
+    return total_obj_disp_err, total_obj_depth_err, total_obj_depth_4_err, total_obj_count
 

@@ -43,6 +43,7 @@ def test(cascade_model, val_loader, logger, log_dir):
                          'depth_abs_err': 0, 'depth_err2': 0, 'depth_err4': 0, 'depth_err8': 0}
     total_obj_disp_err = np.zeros(cfg.SPLIT.OBJ_NUM)
     total_obj_depth_err = np.zeros(cfg.SPLIT.OBJ_NUM)
+    total_obj_depth_4_err = np.zeros(cfg.SPLIT.OBJ_NUM)
     total_obj_count = np.zeros(cfg.SPLIT.OBJ_NUM)
     os.mkdir(os.path.join(log_dir, 'pred_disp'))
     os.mkdir(os.path.join(log_dir, 'gt_disp'))
@@ -126,10 +127,12 @@ def test(cascade_model, val_loader, logger, log_dir):
         logger.info(f'Test instance {prefix} - {err_metrics}')
 
         # Get object error
-        obj_disp_err, obj_depth_err, obj_count = compute_obj_err(img_disp_l, img_depth_l, pred_disp, img_focal_length,
-                                                                 img_baseline, img_label, mask, cfg.SPLIT.OBJ_NUM)
+        obj_disp_err, obj_depth_err, \
+            obj_depth_4_err, obj_count = compute_obj_err(img_disp_l, img_depth_l, pred_disp, img_focal_length,
+                                                     img_baseline, img_label, mask, cfg.SPLIT.OBJ_NUM)
         total_obj_disp_err += obj_disp_err
         total_obj_depth_err += obj_depth_err
+        total_obj_depth_4_err += obj_depth_4_err
         total_obj_count += obj_count
 
         # Get disparity image
@@ -171,7 +174,8 @@ def test(cascade_model, val_loader, logger, log_dir):
     # Save object error to csv file
     total_obj_disp_err /= total_obj_count
     total_obj_depth_err /= total_obj_count
-    save_obj_err_file(total_obj_disp_err, total_obj_depth_err, log_dir)
+    total_obj_depth_4_err /= total_obj_count
+    save_obj_err_file(total_obj_disp_err, total_obj_depth_err, total_obj_depth_4_err, log_dir)
 
     logger.info(f'Successfully saved object error to obj_err.txt')
 

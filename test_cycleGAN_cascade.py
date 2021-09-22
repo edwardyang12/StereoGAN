@@ -24,7 +24,7 @@ parser.add_argument('--config-file', type=str, default='./configs/local_test.yam
                     metavar='FILE', help='Config files')
 parser.add_argument('--model', type=str, default='', metavar='FILE', help='Path to test model')
 parser.add_argument('--gan-model', type=str, default='', metavar='FILE', help='Path to test gan model')
-parser.add_argument('--output', type=str, default='../testing_output', help='Path to output folder')
+parser.add_argument('--output', type=str, default='../testing_output_cyclegan_cascade', help='Path to output folder')
 parser.add_argument('--debug', action='store_true', default=False, help='Debug mode')
 parser.add_argument('--annotate', type=str, default='', help='Annotation to the experiment')
 parser.add_argument('--onreal', action='store_true', default=False, help='Test on real dataset')
@@ -51,6 +51,7 @@ def test(gan_model, cascade_model, val_loader, logger, log_dir):
                          'depth_abs_err': 0, 'depth_err2': 0, 'depth_err4': 0, 'depth_err8': 0}
     total_obj_disp_err = np.zeros(cfg.SPLIT.OBJ_NUM)
     total_obj_depth_err = np.zeros(cfg.SPLIT.OBJ_NUM)
+    total_obj_depth_4_err = np.zeros(cfg.SPLIT.OBJ_NUM)
     total_obj_count = np.zeros(cfg.SPLIT.OBJ_NUM)
     os.mkdir(os.path.join(log_dir, 'pred_disp'))
     os.mkdir(os.path.join(log_dir, 'gt_disp'))
@@ -162,10 +163,12 @@ def test(gan_model, cascade_model, val_loader, logger, log_dir):
         logger.info(f'Test instance {prefix} - {err_metrics}')
 
         # Get object error
-        obj_disp_err, obj_depth_err, obj_count = compute_obj_err(img_disp_l, img_depth_l, pred_disp, img_focal_length,
-                                                                 img_baseline, img_label, mask, cfg.SPLIT.OBJ_NUM)
+        obj_disp_err, obj_depth_err, \
+            obj_depth_4_err, obj_count = compute_obj_err(img_disp_l, img_depth_l, pred_disp, img_focal_length,
+                                                     img_baseline, img_label, mask, cfg.SPLIT.OBJ_NUM)
         total_obj_disp_err += obj_disp_err
         total_obj_depth_err += obj_depth_err
+        total_obj_depth_4_err += obj_depth_4_err
         total_obj_count += obj_count
 
         # Get disparity image
@@ -207,14 +210,15 @@ def test(gan_model, cascade_model, val_loader, logger, log_dir):
     # Save object error to csv file
     total_obj_disp_err /= total_obj_count
     total_obj_depth_err /= total_obj_count
-    save_obj_err_file(total_obj_disp_err, total_obj_depth_err, log_dir)
+    total_obj_depth_4_err /= total_obj_count
+    save_obj_err_file(total_obj_disp_err, total_obj_depth_err, total_obj_depth_4_err, log_dir)
 
     logger.info(f'Successfully saved object error to obj_err.txt')
 
 
 def main():
     # Obtain the dataloader
-    val_loader = get_test_loader(cfg.SPLIT.VAL, args.debug, sub=10, onReal=args.onreal)
+    val_loader = get_test_loader(cfg.SPLIT.VAL, args.debug, sub=40, onReal=args.onreal)
 
     # Tensorboard and logger
     os.makedirs(args.output, exist_ok=True)
