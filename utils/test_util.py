@@ -64,19 +64,17 @@ def save_img(log_dir, prefix,
     plt.close('all')
 
 
-def save_gan_img(img_outputs, path):
+def save_gan_img(img_outputs, path, nrow=2, ncol=2):
     # Create plt figure
     fig = plt.figure(figsize=(24, 12))
-    rows = 3
-    columns = 4
     count = 1
     for tag, dict_value in img_outputs.items():
         for subtag, img_value in dict_value.items():
-            img = img_value[0].repeat(3, 1, 1).permute(1, 2, 0).cpu().detach().numpy()  # [H, W, 3]
+            img = img_value[0].permute(1, 2, 0).cpu().detach().numpy()  # [H, W, 3]
             img = (img + 1) / 2     # normalize to [0,1]
             img_title = f'{tag}-{subtag}'
             # Add image
-            fig.add_subplot(rows, columns, count)
+            fig.add_subplot(nrow, ncol, count)
             plt.imshow(img)
             plt.axis('off')
             plt.title(img_title, fontsize=20)

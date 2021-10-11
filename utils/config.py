@@ -39,15 +39,16 @@ _C.REAL.PAD_HEIGHT = 544
 
 # Solver args
 _C.SOLVER = CN()
-_C.SOLVER.LR_CASCADE = 0.001        # base learning rate for cascade
-_C.SOLVER.LR_G = 0.0002             # base learning rate for G
-_C.SOLVER.LR_D = 0.0003             # base learning rate for D
-_C.SOLVER.LR_EPOCHS = '5,10,15:2'   # the epochs to decay lr: the downscale rate
-_C.SOLVER.LR_STEPS = '5,10,15:2'    # the steps to decay lr: the downscale rate
-_C.SOLVER.EPOCHS = 20               # number of epochs to train
-_C.SOLVER.STEPS = 10000             # number of steps to train
-_C.SOLVER.BATCH_SIZE = 1            # batch size
-_C.SOLVER.NUM_WORKER = 1            # num_worker in dataloader
+_C.SOLVER.LR_CASCADE = 0.001            # base learning rate for cascade
+_C.SOLVER.LR_G = 0.0002                 # base learning rate for G
+_C.SOLVER.LR_D = 0.0003                 # base learning rate for D
+_C.SOLVER.LR_EPOCHS = '5,10,15:2'       # the epochs to decay lr: the downscale rate
+_C.SOLVER.LR_GAN_STEPS = '5,10,15:2'    # the steps to decay lr: the downscale rate
+_C.SOLVER.LR_STEPS = '5,10,15:2'        # the steps to decay lr: the downscale rate
+_C.SOLVER.EPOCHS = 20                   # number of epochs to train
+_C.SOLVER.STEPS = 10000                 # number of steps to train
+_C.SOLVER.BATCH_SIZE = 1                # batch size
+_C.SOLVER.NUM_WORKER = 1                # num_worker in dataloader
 
 # Model args
 _C.ARGS = CN()
@@ -70,5 +71,5 @@ _C.DATA_AUG.BRIGHT_MAX = 1.4
 _C.DATA_AUG.CONTRAST_MIN = 0.8
 _C.DATA_AUG.CONTRAST_MAX = 1.2
 _C.DATA_AUG.GAUSSIAN_MIN = 0.1
-_C.DATA_AUG.GAUSSIAN_MAX = 2
+_C.DATA_AUG.GAUSSIAN_MAX = 2.0
 _C.DATA_AUG.GAUSSIAN_KERNEL = 9

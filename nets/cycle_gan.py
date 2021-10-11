@@ -26,15 +26,17 @@ class CycleGANModel:
         self.isTrain = isTrain
 
         # Define networks for both generators and discriminators
-        self.netG_A = define_G(input_nc=1, output_nc=1, ngf=64, netG='resnet_9blocks', norm='instance')
-        self.netG_B = define_G(input_nc=1, output_nc=1, ngf=64, netG='resnet_9blocks', norm='instance')
+        self.netG_A = define_G(input_nc=3, output_nc=3, ngf=64, netG='resnet_6blocks', norm='instance')
+        self.netG_B = define_G(input_nc=3, output_nc=3, ngf=64, netG='resnet_6blocks', norm='instance')
 
         if self.isTrain:
-            self.netD_A = define_D(input_nc=1, ndf=64, netD='basic')
-            self.netD_B = define_D(input_nc=1, ndf=64, netD='basic')
+            self.netD_A = define_D(input_nc=3, ndf=64, netD='basic')
+            self.netD_B = define_D(input_nc=3, ndf=64, netD='basic')
             # Create image buffer to store previously generated images
-            self.fake_A_pool = ImagePool(pool_size=50)
-            self.fake_B_pool = ImagePool(pool_size=50)
+            self.fake_A_L_pool = ImagePool(pool_size=50)
+            self.fake_A_R_pool = ImagePool(pool_size=50)
+            self.fake_B_L_pool = ImagePool(pool_size=50)
+            self.fake_B_R_pool = ImagePool(pool_size=50)
             # Define loss functions
             self.criterionGAN = GANLoss(gan_mode='lsgan')
             self.criterionCycle = torch.nn.L1Loss()
@@ -84,7 +86,8 @@ class CycleGANModel:
     def set_input(self, input):
         self.real_A_L = input['img_L']
         self.real_A_R = input['img_R']
-        self.real_B = input['img_real']
+        self.real_B_L = input['img_real_L']
+        self.real_B_R = input['img_real_R']
 
     def forward(self):
         # fake_B = G_A(A)
@@ -94,17 +97,22 @@ class CycleGANModel:
         self.rec_A_L = self.netG_B(self.fake_B_L)
         self.rec_A_R = self.netG_B(self.fake_B_R)
         # fake_A = G_B(B)
-        self.fake_A = self.netG_B(self.real_B)
+        self.fake_A_L = self.netG_B(self.real_B_L)
+        self.fake_A_R = self.netG_B(self.real_B_R)
         # recover_B = G_A(fake_A)
-        self.rec_B = self.netG_A(self.fake_A)
+        self.rec_B_L = self.netG_A(self.fake_A_L)
+        self.rec_B_R = self.netG_A(self.fake_A_R)
 
     def compute_loss_G(self):
         """Calculate the loss for generators G_A and G_B"""
         # Identity loss
         if self.lambda_identity > 0:
             # G_A should output identical result as input if real_B is fed: ||G_A(real_B) - real_B||
-            self.idt_A = self.netG_A(self.real_B)
-            self.loss_idt_A = self.criterionIdt(self.idt_A, self.real_B) * self.lambdaB * self.lambda_identity
+            self.idt_A_L = self.netG_A(self.real_B_L)
+            self.idt_A_R = self.netG_A(self.real_B_R)
+            self.loss_idt_A_L = self.criterionIdt(self.idt_A_L, self.real_B_L) * self.lambdaB * self.lambda_identity
+            self.loss_idt_A_R = self.criterionIdt(self.idt_A_R, self.real_B_R) * self.lambdaB * self.lambda_identity
+            self.loss_idt_A = (self.loss_idt_A_L + self.loss_idt_A_R) * 0.5
             # G_B should output identical result as input if real_A(L and R) is fed: ||G_B(real_A) - real_A||
             self.idt_B_L = self.netG_B(self.real_A_L)
             self.idt_B_R = self.netG_B(self.real_A_R)
@@ -120,7 +128,9 @@ class CycleGANModel:
         self.loss_G_A_R = self.criterionGAN(self.netD_A(self.fake_B_R), True)
         self.loss_G_A = (self.loss_G_A_L + self.loss_G_A_R) * 0.5
         # G_B loss = D_B(G_B(real_B))
-        self.loss_G_B = self.criterionGAN(self.netD_B(self.fake_A), True)
+        self.loss_G_B_L = self.criterionGAN(self.netD_B(self.fake_A_L), True)
+        self.loss_G_B_R = self.criterionGAN(self.netD_B(self.fake_A_R), True)
+        self.loss_G_B = (self.loss_G_B_L + self.loss_G_B_R) * 0.5
 
         # Forward cycle loss ||G_B(fake_B) - real_A||
         self.loss_cycle_A_L = self.criterionCycle(self.rec_A_L, self.real_A_L) * self.lambdaA
@@ -128,7 +138,9 @@ class CycleGANModel:
         self.loss_cycle_A = (self.loss_cycle_A_L + self.loss_cycle_A_R) * 0.5
 
         # Backward cycle loss ||G_A(fake_A) - real_B||
-        self.loss_cycle_B = self.criterionCycle(self.rec_B, self.real_B) * self.lambdaB
+        self.loss_cycle_B_L = self.criterionCycle(self.rec_B_L, self.real_B_L) * self.lambdaB
+        self.loss_cycle_B_R = self.criterionCycle(self.rec_B_R, self.real_B_R) * self.lambdaB
+        self.loss_cycle_B = (self.loss_cycle_B_L + self.loss_cycle_B_R) * 0.5
 
         # Combine losses and calculate gradients
         self.loss_G = self.loss_G_A + self.loss_G_B + \
@@ -159,17 +171,18 @@ class CycleGANModel:
 
     def compute_loss_D_A(self):
         """Calculate GAN loss for discriminator D_A"""
-        fake_B_L = self.fake_B_pool.query(self.fake_B_L)
-        fake_B_R = self.fake_B_pool.query(self.fake_B_R)
-        self.loss_D_A_L = self.compute_loss_D_basic(self.netD_A, self.real_B, fake_B_L)
-        self.loss_D_A_R = self.compute_loss_D_basic(self.netD_A, self.real_B, fake_B_R)
+        fake_B_L = self.fake_B_L_pool.query(self.fake_B_L)
+        fake_B_R = self.fake_B_R_pool.query(self.fake_B_R)
+        self.loss_D_A_L = self.compute_loss_D_basic(self.netD_A, self.real_B_L, fake_B_L)
+        self.loss_D_A_R = self.compute_loss_D_basic(self.netD_A, self.real_B_R, fake_B_R)
         self.loss_D_A = (self.loss_D_A_L + self.loss_D_A_R) * 0.5
 
     def compute_loss_D_B(self):
         """Calculate GAN loss for discriminator D_B"""
-        fake_A = self.fake_A_pool.query(self.fake_A)
-        self.loss_D_B_L = self.compute_loss_D_basic(self.netD_B, self.real_A_L, fake_A)
-        self.loss_D_B_R = self.compute_loss_D_basic(self.netD_B, self.real_A_R, fake_A)
+        fake_A_L = self.fake_A_L_pool.query(self.fake_A_L)
+        fake_A_R = self.fake_A_R_pool.query(self.fake_A_R)
+        self.loss_D_B_L = self.compute_loss_D_basic(self.netD_B, self.real_A_L, fake_A_L)
+        self.loss_D_B_R = self.compute_loss_D_basic(self.netD_B, self.real_A_R, fake_A_R)
         self.loss_D_B = (self.loss_D_B_L + self.loss_D_B_R) * 0.5
 
     def update_D(self):
@@ -189,6 +202,7 @@ class CycleGANModel:
         self.compute_loss_G()   # calculate gradient for G_A and G_B
         self.loss_G.backward()
         self.optimizer_G.step()     # update Gs weights
+
         # Update Ds
         self.set_requires_grad([self.netD_A, self.netD_B], True)
         self.optimizer_D.zero_grad()
@@ -210,18 +224,19 @@ class CycleGANModel:
 
 
 if __name__ == '__main__':
-    h, w = 256, 512
-    img_L = torch.rand(1, 1, h, w).cuda()
-    img_R = torch.rand(1, 1, h, w).cuda()
-    img_real = torch.rand(1, 1, h, w).cuda()
-    input = {'img_L': img_L, 'img_R': img_R, 'img_real': img_real}
+    h, w = 256, 256
+    img_L = torch.rand(1, 3, h, w).cuda()
+    img_R = torch.rand(1, 3, h, w).cuda()
+    img_real_L = torch.rand(1, 3, h, w).cuda()
+    img_real_R = torch.rand(1, 3, h, w).cuda()
+    input = {'img_L': img_L, 'img_R': img_R, 'img_real_L': img_real_L, 'img_real_R': img_real_R}
 
     cuda_device = torch.device("cuda:{}".format(0))
     cycleGAN = CycleGANModel()
     cycleGAN.set_device(cuda_device)
     cycleGAN.set_input(input)
 
-    # cycleGAN.forward()
+    cycleGAN.forward()
     #
     # fake_B_L = cycleGAN.fake_B_L
     # fake_A = cycleGAN.fake_A

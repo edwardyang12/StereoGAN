@@ -120,9 +120,9 @@ class PSMNet(nn.Module):
             elif isinstance(m, nn.Linear):
                 m.bias.data.zero_()
 
-    def forward(self, img_L, img_R):
-        refimg_feature = self.feature_extraction(img_L)  # [bs, 32, H/4, W/4]
-        targetimg_feature = self.feature_extraction(img_R)
+    def forward(self, img_L, img_R, img_L_transformed, img_R_transformed):
+        refimg_feature = self.feature_extraction(img_L, img_L_transformed)  # [bs, 32, H/4, W/4]
+        targetimg_feature = self.feature_extraction(img_R, img_R_transformed)
 
         # Cost Volume
         [bs, feature_size, H, W] = refimg_feature.size()

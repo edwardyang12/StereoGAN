@@ -116,13 +116,13 @@ def save_images(logger, mode_tag, images_dict, global_step):
                              global_step)
 
 
-def save_images_grid(logger, mode_tag, images_dict, global_step):
+def save_images_grid(logger, mode_tag, images_dict, global_step, nrow=5):
     for tag, dict_value in images_dict.items():
         img_list = []
         grid_name = f'{mode_tag}/{tag}'
         for subtag, img_value in dict_value.items():
             img_list += [img_value[0]]
-        logger.add_image(grid_name, vutils.make_grid(img_list, padding=0, nrow=4, normalize=True, scale_each=True),
+        logger.add_image(grid_name, vutils.make_grid(img_list, padding=0, nrow=nrow, normalize=True, scale_each=True),
                          global_step)
 
 

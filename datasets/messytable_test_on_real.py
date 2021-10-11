@@ -6,21 +6,15 @@ Feature:
 import os
 import numpy as np
 import random
-from PIL import Image, ImageEnhance
+import cv2
+from PIL import Image
 import torch
 import torchvision.transforms as Transforms
 from torch.utils.data import Dataset, DataLoader
-import cv2
 
 from utils.config import cfg
 from utils.util import load_pickle
 from utils.test_util import calc_left_ir_depth_from_rgb
-
-
-def gamma_trans(img, gamma):
-    gamma_table = [np.power(x/255.0, gamma)*255.0 for x in range(256)]
-    gamma_table = np.round(np.array(gamma_table)).astype(np.uint8)
-    return cv2.LUT(img, gamma_table)
 
 
 def __data_augmentation__(gaussian_blur=False, color_jitter=False):
@@ -68,7 +62,6 @@ class MessytableTestDataset(Dataset):
         self.img_meta, self.img_label, self.img_sim_realsense, self.img_real_realsense \
             = self.__get_split_files__(split_file, debug=debug, sub=sub)
         self.onReal = onReal
-        self.brightness_factor = 1.8
 
     @staticmethod
     def __get_split_files__(split_file, debug=False, sub=100):
@@ -121,29 +114,22 @@ class MessytableTestDataset(Dataset):
 
     def __getitem__(self, idx):
         if self.onReal:
-            # Adjust brightness of real images
-            img_L_rgb = Image.open(self.img_L_real[idx]).convert(mode='L')
-            img_R_rgb = Image.open(self.img_R_real[idx]).convert(mode='L')
-            img_L_rgb = gamma_trans(np.array(img_L_rgb), 0.25)
-            img_R_rgb = gamma_trans(np.array(img_R_rgb), 0.25)
-            # img_L_rgb = np.array(img_L_rgb)
-            # img_R_rgb = np.array(img_R_rgb)
-            img_L_rgb = img_L_rgb[:, :, None]
-            img_R_rgb = img_R_rgb[:, :, None]
-            img_L_rgb = np.repeat(img_L_rgb, 3, axis=-1)
-            img_R_rgb = np.repeat(img_R_rgb, 3, axis=-1)
-
-            img_L_rgb_sim = np.array(Image.open(self.img_L[idx]))[:, :, :-1]
-            img_R_rgb_sim = np.array(Image.open(self.img_R[idx]))[:, :, :-1]
+            img_L_rgb = cv2.resize(cv2.imread(self.img_L_real[idx], flags=cv2.IMREAD_COLOR),
+                                   (960, 540), interpolation=cv2.INTER_LINEAR)
+            img_R_rgb = cv2.resize(cv2.imread(self.img_R_real[idx], flags=cv2.IMREAD_COLOR),
+                                   (960, 540), interpolation=cv2.INTER_LINEAR)
+            # img_L_rgb = (np.array(Image.open(self.img_L_real[idx]).convert(mode='L'))[:, :, None] - 127.5) / 127.5
+            # img_R_rgb = (np.array(Image.open(self.img_R_real[idx]).convert(mode='L'))[:, :, None] - 127.5) / 127.5
+            img_L_rgb_sim = (np.array(Image.open(self.img_L[idx]))[:, :, :1] - 127.5) / 127.5
+            img_R_rgb_sim = (np.array(Image.open(self.img_R[idx]))[:, :, :1] - 127.5) / 127.5
             img_depth_realsense = np.array(Image.open(self.img_real_realsense[idx])) / 1000
-
         else:
-            img_L_rgb = np.array(Image.open(self.img_L[idx]))[:, :, :-1]
-            img_R_rgb = np.array(Image.open(self.img_R[idx]))[:, :, :-1]
-            img_L_rgb_real = np.array(Image.open(self.img_L_real[idx]).convert(mode='L'))[:, :, None]
-            img_R_rgb_real = np.array(Image.open(self.img_R_real[idx]).convert(mode='L'))[:, :, None]
-            img_L_rgb_real = np.repeat(img_L_rgb_real, 3, axis=-1)
-            img_R_rgb_real = np.repeat(img_R_rgb_real, 3, axis=-1)
+            img_L_rgb = np.array(Image.open(self.img_L[idx]))[:, :, :-1]  # [H, W, 3]
+            img_R_rgb = np.array(Image.open(self.img_R[idx]))[:, :, :-1]  # [H, W, 3]
+            # img_L_rgb = (np.array(Image.open(self.img_L[idx]))[:, :, :1] - 127.5) / 127.5
+            # img_R_rgb = (np.array(Image.open(self.img_R[idx]))[:, :, :1] - 127.5) / 127.5
+            img_L_rgb_real = (np.array(Image.open(self.img_L_real[idx]).convert(mode='L'))[:, :, None] - 127.5) / 127.5
+            img_R_rgb_real = (np.array(Image.open(self.img_R_real[idx]).convert(mode='L'))[:, :, None] - 127.5) / 127.5
             img_depth_realsense = np.array(Image.open(self.img_sim_realsense[idx])) / 1000
 
         img_depth_l = np.array(Image.open(self.img_depth_l[idx])) / 1000  # convert from mm to m
@@ -172,12 +158,15 @@ class MessytableTestDataset(Dataset):
                                                           extrinsic, extrinsic_l, img_depth_realsense)
 
         # Get data augmentation
-        # custom_augmentation = __data_augmentation__(gaussian_blur=self.gaussian_blur, color_jitter=self.color_jitter)
-        normalization = __data_augmentation__(gaussian_blur=False, color_jitter=False)
+        custom_augmentation = __data_augmentation__(gaussian_blur=False, color_jitter=False)
 
         item = {}
-        item['img_L'] = normalization(img_L_rgb).type(torch.FloatTensor)
-        item['img_R'] = normalization(img_R_rgb).type(torch.FloatTensor)
+        item['img_L'] = custom_augmentation(img_L_rgb).type(torch.FloatTensor)
+        item['img_R'] = custom_augmentation(img_R_rgb).type(torch.FloatTensor)
+
+        # item['img_L'] = torch.tensor(img_L_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
+        # item['img_R'] = torch.tensor(img_R_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
+
         item['img_disp_l'] = torch.tensor(img_disp_l, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W]
         item['img_depth_l'] = torch.tensor(img_depth_l, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W]
         item['img_disp_r'] = torch.tensor(img_disp_r, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W]
@@ -189,11 +178,11 @@ class MessytableTestDataset(Dataset):
         item['baseline'] = torch.tensor(baseline, dtype=torch.float32).unsqueeze(0).unsqueeze(0).unsqueeze(0)
 
         if self.onReal is False:
-            item['img_L_real'] = normalization(img_L_rgb_real).type(torch.FloatTensor)
-            item['img_R_real'] = normalization(img_R_rgb_real).type(torch.FloatTensor)
+            item['img_L_real'] = torch.tensor(img_L_rgb_real, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
+            item['img_R_real'] = torch.tensor(img_R_rgb_real, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
         else:
-            item['img_L_sim'] = normalization(img_L_rgb_sim).type(torch.FloatTensor)
-            item['img_R_sim'] = normalization(img_R_rgb_sim).type(torch.FloatTensor)
+            item['img_L_sim'] = torch.tensor(img_L_rgb_sim, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
+            item['img_R_sim'] = torch.tensor(img_R_rgb_sim, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
 
         return item
 
