@@ -46,7 +46,7 @@ ARGS:
   USING_NS: True            # using neighbor search
   NS_SIZE: 3                # nb_size
   CROP_HEIGHT: 256          # crop height
-  CROP_WIDTH: 512           # crop width
+  CROP_WIDTH: 256           # crop width
 
 # Data augmentation
 DATA_AUG:
