@@ -110,7 +110,7 @@ class FeatureExtraction(nn.Module):
         # SPP module
         self.branch1 = nn.Sequential(
             nn.AvgPool2d((64, 64), stride=(64, 64)),
-            convbn(128, 32, 1, 1, 0, 1),
+            conv(128, 32, 1, 1, 0, 1),
             nn.ReLU(inplace=True)
         )
         self.branch2 = nn.Sequential(
