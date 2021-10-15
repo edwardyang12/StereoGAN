@@ -45,7 +45,6 @@ class FastGradientSignUntargeted():
     """
     def __init__(self, model, epsilon=0.2, alpha=0.025, min_val=-2, max_val=2, max_iters=1, _type='linf'):
         self.model = model
-        # self.model.eval()
 
         # Maximum perturbation
         self.epsilon = epsilon
