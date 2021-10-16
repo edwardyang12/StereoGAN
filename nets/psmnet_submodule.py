@@ -107,12 +107,12 @@ class FeatureExtraction(nn.Module):
         self.layer3 = self._make_layer(BasicBlock, 128, 3, 1, 1, 1)     # conv3_x
         self.layer4 = self._make_layer(BasicBlock, 128, 3, 1, 1, 2)     # conv4_x
 
-        # # SPP module
-        # self.branch1 = nn.Sequential(
-        #     nn.AvgPool2d((64, 64), stride=(64, 64)),
-        #     convbn(128, 32, 1, 1, 0, 1),
-        #     nn.ReLU(inplace=True)
-        # )
+        # SPP module
+        self.branch1 = nn.Sequential(
+            nn.AvgPool2d((64, 64), stride=(64, 64)),
+            convbn(128, 32, 1, 1, 0, 1),
+            nn.ReLU(inplace=True)
+        )
         self.branch2 = nn.Sequential(
             nn.AvgPool2d((32, 32), stride=(32, 32)),
             convbn(128, 32, 1, 1, 0, 1),
@@ -129,8 +129,8 @@ class FeatureExtraction(nn.Module):
             nn.ReLU(inplace=True)
         )
         self.lastconv = nn.Sequential(
-            convbn(288, 128, 3, 1, 1, 1),
-            # convbn(320, 128, 3, 1, 1, 1),
+            # convbn(288, 128, 3, 1, 1, 1),
+            convbn(320, 128, 3, 1, 1, 1),
             nn.ReLU(inplace=True),
             nn.Conv2d(128, 32, kernel_size=1, padding=0, stride=1, bias=False)
         )
@@ -180,8 +180,8 @@ class FeatureExtraction(nn.Module):
 
         # # SPP module
         [H, W] = output_skip.size()[-2:]
-        # output_branch1 = self.branch1(output_skip)
-        # output_branch1 = F.interpolate(output_branch1, (H, W), mode='bilinear', align_corners=True)
+        output_branch1 = self.branch1(output_skip)
+        output_branch1 = F.interpolate(output_branch1, (H, W), mode='bilinear', align_corners=True)
 
         output_branch2 = self.branch2(output_skip)
         output_branch2 = F.interpolate(output_branch2, (H, W), mode='bilinear', align_corners=True)
@@ -192,21 +192,21 @@ class FeatureExtraction(nn.Module):
         output_branch4 = self.branch4(output_skip)
         output_branch4 = F.interpolate(output_branch4, (H, W), mode='bilinear', align_corners=True)
 
-        output_feature = torch.cat((
-            output_raw,
-            output_skip,
-            output_branch4,
-            output_branch3,
-            output_branch2,
-        ), 1)
         # output_feature = torch.cat((
         #     output_raw,
         #     output_skip,
         #     output_branch4,
         #     output_branch3,
         #     output_branch2,
-        #     output_branch1
         # ), 1)
+        output_feature = torch.cat((
+            output_raw,
+            output_skip,
+            output_branch4,
+            output_branch3,
+            output_branch2,
+            output_branch1
+        ), 1)
         output_feature = self.lastconv(output_feature)  # [bs, 32, H/4, W/4]
         return output_feature
 

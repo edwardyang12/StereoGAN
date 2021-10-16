@@ -8,8 +8,10 @@ DIR:
 SPLIT:
   TRAIN: '/code/dataset_local_v9/training_lists/all_train.txt'  # training lists of your training set
   VAL: '/code/dataset_local_v9/training_lists/all_val.txt'  # training lists of your validation set
-  LEFT: '0128_irL_denoised_half.png'
-  RIGHT: '0128_irR_denoised_half.png'
+  LEFT: '0128_irL_kuafuv2_half.png'
+  LEFT_NO_IR: '0128_irL_kuafu_half_no_ir.png'
+  RIGHT: '0128_irR_kuafuv2_half.png'
+  RIGHT_NO_IR: '0128_irR_kuafu_half_no_ir.png'
   DEPTHL: 'depthL.png'
   DEPTHR: 'depthR.png'
   META: 'meta.pkl'
@@ -30,7 +32,7 @@ SOLVER:
   STEPS: 10000                              # number of steps to train
   EPOCHS: 1
   BATCH_SIZE: 1                             # batch size
-  NUM_WORKER: 1                               # num_worker in dataloader
+  NUM_WORKER: 1                             # num_worker in dataloader
 
 # Model parameters
 ARGS:
@@ -56,5 +58,5 @@ DATA_AUG:
 
   # Gaussian blur
   GAUSSIAN_MIN: 0.1
-  GAUSSIAN_MAX: 2
+  GAUSSIAN_MAX: 2.0
   GAUSSIAN_KERNEL: 9

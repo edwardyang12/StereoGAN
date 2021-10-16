@@ -18,8 +18,10 @@ _C.SPLIT.TRAIN = '/code/dataset_local_v9/training_lists/all_train.txt'  # traini
 _C.SPLIT.VAL = '/code/dataset_local_v9/training_lists/all_val.txt'  # training lists of your validation dataset
 _C.SPLIT.OBJ_NUM = 18  # Note: table + ground - 17th
 
-_C.SPLIT.LEFT = '0128_irL_denoised_half.png'
-_C.SPLIT.RIGHT = '0128_irR_denoised_half.png'
+_C.SPLIT.LEFT = '0128_irL_kuafuv2_half.png'
+_C.SPLIT.LEFT_NO_IR = '0128_irL_kuafu_half_no_ir.png'
+_C.SPLIT.RIGHT = '0128_irR_kuafuv2_half.png'
+_C.SPLIT.RIGHT_NO_IR = '0128_irR_kuafu_half_no_ir.png'
 _C.SPLIT.DEPTH = 'depth.png'
 _C.SPLIT.DEPTHL = 'depthL.png'
 _C.SPLIT.DEPTHR = 'depthR.png'

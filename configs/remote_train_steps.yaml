@@ -8,8 +8,10 @@ DIR:
 SPLIT:
   TRAIN: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_train.txt'  # training lists of your training set
   VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_val.txt'  # training lists of your validation set
-  LEFT: '0128_irL_denoised_half.png'
-  RIGHT: '0128_irR_denoised_half.png'
+  LEFT: '0128_irL_kuafuv2_half.png'
+  LEFT_NO_IR: '0128_irL_kuafu_half_no_ir.png'
+  RIGHT: '0128_irR_kuafuv2_half.png'
+  RIGHT_NO_IR: '0128_irR_kuafu_half_no_ir.png'
   DEPTHL: 'depthL.png'
   DEPTHR: 'depthR.png'
   META: 'meta.pkl'
@@ -30,7 +32,7 @@ SOLVER:
   LR_STEPS: '10000,20000,30000:2'    # the steps to decay lr: the downscale rate
   STEPS: 50000                              # number of steps to train
   EPOCHS: 4
-  BATCH_SIZE: 1                             # batch size
+  BATCH_SIZE: 2                             # batch size
   NUM_WORKER: 1                               # num_worker in dataloader
 
 # Model parameters
@@ -45,7 +47,7 @@ ARGS:
   USING_NS: True            # using neighbor search
   NS_SIZE: 3                # nb_size
   CROP_HEIGHT: 256          # crop height
-  CROP_WIDTH: 256           # crop width
+  CROP_WIDTH: 512           # crop width
 
 # Data augmentation
 DATA_AUG:

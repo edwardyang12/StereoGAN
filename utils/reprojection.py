@@ -29,21 +29,22 @@ def apply_disparity(img, disp):
     return output
 
 
-def get_reprojection_error(input_L, input_R, pred_disp, gt_disp=None):
+def get_reprojection_error(input_L, input_R, pred_disp_l, mask=None):
     """
     input - [bs, c, h, w], feature or image
     pred_disp - [bs, 1, h, w], this should come from left camera frame
     mask - [bs, 1, h, w]
+    Note: apply_disparity use pred_disp_l to warp right image to left image (since F.grid_sample behaves a bit different),
+    while appliy_disparity_cu use pred_disp_l to warp left to right
     """
-    input_R_warped = apply_disparity(input_L, pred_disp)
-    if gt_disp is not None:
-        disp_warped = apply_disparity_cu(gt_disp, -gt_disp.type(torch.int))
+    input_L_warped = apply_disparity(input_R, -pred_disp_l)
+    if mask is not None:
+        bs, c, h, w = input_L.shape
+        mask = mask.repeat(1, c, 1, 1)
     else:
-        disp_warped = apply_disparity_cu(pred_disp, -pred_disp.type(torch.int))
-    mask = (disp_warped < 192) * (disp_warped > 0)
-    mask = mask.repeat(1, 3, 1, 1)
-    reprojection_loss = F.mse_loss(input_R[mask], input_R_warped[mask])
-    return reprojection_loss, input_R_warped, mask.type(torch.int)
+        mask = torch.ones_like(input_L_warped).type(torch.bool)
+    reprojection_loss = F.mse_loss(input_L_warped[mask], input_L[mask])
+    return reprojection_loss, input_L_warped, mask.type(torch.int)
 
 
 if __name__ == '__main__':
