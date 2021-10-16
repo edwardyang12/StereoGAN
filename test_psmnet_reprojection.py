@@ -10,22 +10,20 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import numpy as np
 
-from nets.cycle_gan import CycleGANModel
 from nets.psmnet import PSMNet
 from nets.transformer import Transformer
 from datasets.messytable_test import get_test_loader
 from utils.cascade_metrics import compute_err_metric, compute_obj_err
 from utils.config import cfg
 from utils.util import get_time_string, setup_logger, depth_error_img, disp_error_img
-from utils.test_util import load_from_dataparallel_model, save_img, save_gan_img, save_obj_err_file
+from utils.test_util import load_from_dataparallel_model, save_img, save_obj_err_file
 from utils.warp_ops import apply_disparity_cu
 
 parser = argparse.ArgumentParser(description='Testing for Reprojection + PSMNet')
 parser.add_argument('--config-file', type=str, default='./configs/local_test.yaml',
                     metavar='FILE', help='Config files')
 parser.add_argument('--model', type=str, default='', metavar='FILE', help='Path to test model')
-parser.add_argument('--gan-model', type=str, default='', metavar='FILE', help='Path to test gan model')
-parser.add_argument('--output', type=str, default='../testing_output_feature_cyclegan_psmnet_new', help='Path to output folder')
+parser.add_argument('--output', type=str, default='../testing_output_psmnet_reprojection', help='Path to output folder')
 parser.add_argument('--debug', action='store_true', default=False, help='Debug mode')
 parser.add_argument('--annotate', type=str, default='', help='Annotation to the experiment')
 parser.add_argument('--onreal', action='store_true', default=False, help='Test on real dataset')
@@ -38,12 +36,10 @@ parser.add_argument("--local_rank", type=int, default=0, help='Rank of device in
 args = parser.parse_args()
 cfg.merge_from_file(args.config_file)
 cuda_device = torch.device("cuda:{}".format(args.local_rank))
-# If path to gan model is not specified, use gan model from cascade model
-if args.gan_model == '':
-    args.gan_model = args.model
+
 
 # python test_psmnet_reprojection.py --model /code/models/model_4.pth --onreal --exclude-bg --exclude-zeros
-# python test_psmnet_reprojection.py --config-file configs/remote_test.yaml --model ../train_8_14_cascade/train1/models/model_best.pth --onreal --exclude-bg --exclude-zeros --debug --gan-model
+# python test_psmnet_reprojection.py --config-file configs/remote_test.yaml --model ../train_8_14_cascade/train1/models/model_best.pth --onreal --exclude-bg --exclude-zeros --debug
 
 
 def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
@@ -61,7 +57,6 @@ def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
     os.mkdir(os.path.join(log_dir, 'pred_depth'))
     os.mkdir(os.path.join(log_dir, 'gt_depth'))
     os.mkdir(os.path.join(log_dir, 'pred_depth_abs_err_cmap'))
-    os.mkdir(os.path.join(log_dir, 'gan'))
 
     for iteration, data in enumerate(tqdm(val_loader)):
         img_L = data['img_L'].cuda()    # [bs, 1, H, W]

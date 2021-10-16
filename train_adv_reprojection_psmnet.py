@@ -172,14 +172,14 @@ def train_sample(sample, transformer_model, psmnet_model,
 
     # Get stereo loss on sim
     mask = (disp_gt < cfg.ARGS.MAX_DISP) * (disp_gt > 0)  # Note in training we do not exclude bg
-
+    mask.detach()
     sim_pred_disp = 0
     if isTrain:
         _, _, pred_disp3 = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
         sim_pred_disp = pred_disp3
 
     # Get reprojection loss on sim
-    sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, sim_pred_disp, disp_gt)
+    sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, sim_pred_disp, mask)
     # sim_img_transformed_reproj_loss, sim_img_transformed_warped = get_reprojection_error(img_L_transformed, img_R_transformed, sim_pred_disp)
 
     adv_L, adv_R = 0, 0
@@ -207,7 +207,6 @@ def train_sample(sample, transformer_model, psmnet_model,
     if isTrain:
         transformer_optimizer.zero_grad()
         psmnet_optimizer.zero_grad()
-        # sim_loss.backward()
         sim_loss.backward()
         psmnet_optimizer.step()
         transformer_optimizer.step()
@@ -221,7 +220,7 @@ def train_sample(sample, transformer_model, psmnet_model,
     else:
         with torch.no_grad():
             real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
-    real_img_reproj_loss, real_img_warped, real_img_reproj_mask = get_reprojection_error(img_real_L, img_real_R, real_pred_disp, disp_gt)
+    real_img_reproj_loss, real_img_warped, real_img_reproj_mask = get_reprojection_error(img_real_L, img_real_R, real_pred_disp)
     # real_img_transformed_reproj_loss, real_img_transformed_warped = get_reprojection_error(img_real_L_transformed, img_real_R_transformed, real_pred_disp)
 
     # Backward on real
@@ -245,14 +244,7 @@ def train_sample(sample, transformer_model, psmnet_model,
         'real_img_reprojection': {
             'R': img_real_R, 'R_warped': real_img_warped, 'mask': real_img_reproj_mask
         }
-        # 'sim_img_reprojection': {
-        #     'R': img_R, 'R_warped': sim_img_warped, 'R_transformed': img_R_transformed,
-        #     'R_transformed_warped': sim_img_transformed_warped
-        # },
-        # 'real_img_reprojection': {
-        #     'R': img_real_R, 'R_warped': real_img_warped, 'R_transformed': img_real_R_transformed,
-        #     'R_transformed_warped': real_img_transformed_warped
-        # }
+
     }
     scalar_outputs_reproj = {'sim_img_reproj_loss': sim_img_reproj_loss.item(),
                              'real_img_reproj_loss': real_img_reproj_loss.item()}
@@ -265,6 +257,7 @@ def train_sample(sample, transformer_model, psmnet_model,
     # Compute stereo error metrics on sim
     pred_disp = sim_pred_disp
     scalar_outputs_psmnet = {'loss': loss_psmnet.item()}
+    scalar_outputs_psmnet.update(scalar_outputs_reproj)
     err_metrics = compute_err_metric(disp_gt,
                                      depth_gt,
                                      pred_disp,
@@ -286,8 +279,7 @@ def train_sample(sample, transformer_model, psmnet_model,
 
     if is_distributed:
         scalar_outputs_psmnet = reduce_scalar_outputs(scalar_outputs_psmnet, cuda_device)
-    return scalar_outputs_reproj, scalar_outputs_psmnet, \
-           img_outputs_psmnet, img_output_reproj
+    return scalar_outputs_reproj, scalar_outputs_psmnet, img_outputs_psmnet, img_output_reproj
 
 
 if __name__ == '__main__':

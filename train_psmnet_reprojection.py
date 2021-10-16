@@ -14,7 +14,6 @@ import torch.nn.functional as F
 
 from datasets.messytable import MessytableDataset
 from nets.psmnet import PSMNet
-from nets.cycle_gan import CycleGANModel
 from nets.transformer import Transformer
 from utils.cascade_metrics import compute_err_metric
 from utils.warp_ops import apply_disparity_cu
