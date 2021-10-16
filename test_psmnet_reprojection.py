@@ -1,6 +1,6 @@
 """
-Author: Isabella Liu 10/3/21
-Feature: Test feature reprojection with PSMNet
+Author: Isabella Liu 10/14/21
+Feature: Test PSMNet Reprojection
 """
 
 import os
@@ -10,19 +10,21 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import numpy as np
 
+from nets.cycle_gan import CycleGANModel
 from nets.psmnet import PSMNet
 from nets.transformer import Transformer
 from datasets.messytable_test import get_test_loader
 from utils.cascade_metrics import compute_err_metric, compute_obj_err
 from utils.config import cfg
 from utils.util import get_time_string, setup_logger, depth_error_img, disp_error_img
-from utils.test_util import load_from_dataparallel_model, save_img, save_obj_err_file
+from utils.test_util import load_from_dataparallel_model, save_img, save_gan_img, save_obj_err_file
 from utils.warp_ops import apply_disparity_cu
 
-parser = argparse.ArgumentParser(description='Testing reprojection with Pyramid Stereo Network')
+parser = argparse.ArgumentParser(description='Testing for Reprojection + PSMNet')
 parser.add_argument('--config-file', type=str, default='./configs/local_test.yaml',
                     metavar='FILE', help='Config files')
 parser.add_argument('--model', type=str, default='', metavar='FILE', help='Path to test model')
+parser.add_argument('--gan-model', type=str, default='', metavar='FILE', help='Path to test gan model')
 parser.add_argument('--output', type=str, default='../testing_output_feature_cyclegan_psmnet_new', help='Path to output folder')
 parser.add_argument('--debug', action='store_true', default=False, help='Debug mode')
 parser.add_argument('--annotate', type=str, default='', help='Annotation to the experiment')
@@ -37,9 +39,11 @@ args = parser.parse_args()
 cfg.merge_from_file(args.config_file)
 cuda_device = torch.device("cuda:{}".format(args.local_rank))
 # If path to gan model is not specified, use gan model from cascade model
+if args.gan_model == '':
+    args.gan_model = args.model
 
-# python test_feature_cycleGAN_psmnet.py --model /code/models/model_4.pth --onreal --exclude-bg --exclude-zeros
-# python test_feature_cycleGAN_psmnet.py --config-file configs/remote_test.yaml --model ../train_8_14_cascade/train1/models/model_best.pth --onreal --exclude-bg --exclude-zeros --debug --gan-model
+# python test_psmnet_reprojection.py --model /code/models/model_4.pth --onreal --exclude-bg --exclude-zeros
+# python test_psmnet_reprojection.py --config-file configs/remote_test.yaml --model ../train_8_14_cascade/train1/models/model_best.pth --onreal --exclude-bg --exclude-zeros --debug --gan-model
 
 
 def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
@@ -57,6 +61,7 @@ def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
     os.mkdir(os.path.join(log_dir, 'pred_depth'))
     os.mkdir(os.path.join(log_dir, 'gt_depth'))
     os.mkdir(os.path.join(log_dir, 'pred_depth_abs_err_cmap'))
+    os.mkdir(os.path.join(log_dir, 'gan'))
 
     for iteration, data in enumerate(tqdm(val_loader)):
         img_L = data['img_L'].cuda()    # [bs, 1, H, W]
@@ -101,7 +106,6 @@ def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
             with torch.no_grad():
                 img_L_transformed, img_R_transformed, img_L_sim_transformed, img_R_sim_transformed\
                     = transformer_model(img_L, img_R, img_L_sim, img_R_sim)
-
         else:
             with torch.no_grad():
                 img_real = data['img_L_real'].cuda()  # [bs, 1, H, W]
@@ -202,13 +206,11 @@ def main():
     os.makedirs(args.output, exist_ok=True)
     log_dir = os.path.join(args.output, f'{get_time_string()}_{args.annotate}')
     os.mkdir(log_dir)
-    logger = setup_logger("Feature reprojection Testing", distributed_rank=0, save_dir=log_dir)
+    logger = setup_logger("Reprojection-PSMNet Testing", distributed_rank=0, save_dir=log_dir)
     logger.info(f'Annotation: {args.annotate}')
     logger.info(f'Input args {args}')
     logger.info(f'Loaded config file \'{args.config_file}\'')
     logger.info(f'Running with configs:\n{cfg}')
-
-
 
     # Get cascade model
     logger.info(f'Loaded the checkpoint: {args.model}')

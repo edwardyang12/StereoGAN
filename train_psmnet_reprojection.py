@@ -1,6 +1,6 @@
 """
-Author: Isabella Liu 9/7/21
-Feature: Train cycle GAN with PSMNet
+Author: Isabella Liu 10/13/21
+Feature: Train PSMNet IR reprojection
 """
 import gc
 import os
@@ -27,7 +27,7 @@ from utils.util import setup_logger, weights_init, \
 
 cudnn.benchmark = True
 
-parser = argparse.ArgumentParser(description='CycleGAN with Pyramid Stereo Network (PSMNet)')
+parser = argparse.ArgumentParser(description='Reprojection with Pyramid Stereo Network (PSMNet)')
 parser.add_argument('--config-file', type=str, default='./configs/local_train_steps.yaml',
                     metavar='FILE', help='Config files')
 parser.add_argument('--summary-freq', type=int, default=500, help='Frequency of saving temporary results')
@@ -61,22 +61,21 @@ cuda_device = torch.device("cuda:{}".format(args.local_rank))
 os.makedirs(args.logdir, exist_ok=True)
 os.makedirs(os.path.join(args.logdir, 'models'), exist_ok=True)
 summary_writer = tensorboardX.SummaryWriter(logdir=args.logdir)
-logger = setup_logger("CycleGAN PSMNet", distributed_rank=args.local_rank, save_dir=args.logdir)
+logger = setup_logger("Reprojection PSMNet", distributed_rank=args.local_rank, save_dir=args.logdir)
 logger.info(f'Loaded config file: \'{args.config_file}\'')
 logger.info(f'Running with configs:\n{cfg}')
 logger.info(f'Running with {num_gpus} GPUs')
 
-# python -m torch.distributed.launch train_feature_cycleGAN_psmnet_fushion.py --summary-freq 1 --save-freq 1 --logdir ../train_10_3_feature_cyclegan_psmnet/debug --debug
-# python -m torch.distributed.launch train_feature_cycleGAN_psmnet_fushion.py --config-file configs/remote_train_steps.yaml --summary-freq 10 --save-freq 100 --logdir ../train_9_7_cyclegan_psmnet/debug --debug
+# python -m torch.distributed.launch train_psmnet_reprojection.py --summary-freq 1 --save-freq 1 --logdir ../train_10_14_psmnet_reprojection/debug --debug
+# python -m torch.distributed.launch train_psmnet_reprojection.py --config-file configs/remote_train_steps.yaml --summary-freq 10 --save-freq 100 --logdir ../train_10_14_psmnet_reprojection/debug --debug
 
 
-def train(transformer_model, gan_model, psmnet_model, transformer_optimizer, psmnet_optimizer,
+def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimizer,
           TrainImgLoader, ValImgLoader):
     cur_err = np.inf    # store best result
 
     for epoch_idx in range(cfg.SOLVER.EPOCHS):
         # One epoch training loop
-        avg_train_scalars_gan = AverageMeterDict()
         avg_train_scalars_psmnet = AverageMeterDict()
         for batch_idx, sample in enumerate(TrainImgLoader):
             global_step = (len(TrainImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE * num_gpus
@@ -84,30 +83,19 @@ def train(transformer_model, gan_model, psmnet_model, transformer_optimizer, psm
                 break
 
             # Adjust learning rate
-            adjust_learning_rate(gan_model.optimizer_G, global_step, cfg.SOLVER.LR_G, cfg.SOLVER.LR_GAN_STEPS)
-            adjust_learning_rate(gan_model.optimizer_D, global_step, cfg.SOLVER.LR_D, cfg.SOLVER.LR_GAN_STEPS)
             adjust_learning_rate(transformer_optimizer, global_step, cfg.SOLVER.LR_CASCADE, cfg.SOLVER.LR_STEPS)
             adjust_learning_rate(psmnet_optimizer, global_step, cfg.SOLVER.LR_CASCADE, cfg.SOLVER.LR_STEPS)
 
             do_summary = global_step % args.summary_freq == 0
             # Train one sample
-            scalar_outputs_gan, scalar_outputs_reproj, scalar_outputs_psmnet, \
-            img_outputs_gan, img_outputs_psmnet, img_output_reproj = \
-                train_sample(sample, transformer_model, gan_model, psmnet_model,
-                             transformer_optimizer, psmnet_optimizer, isTrain=True)
+            scalar_outputs_reproj, scalar_outputs_psmnet, img_outputs_psmnet, img_output_reproj = \
+                train_sample(sample, transformer_model, psmnet_model, transformer_optimizer,
+                             psmnet_optimizer, isTrain=True)
             # Save result to tensorboard
             if (not is_distributed) or (dist.get_rank() == 0):
-                scalar_outputs_gan = tensor2float(scalar_outputs_gan)
                 scalar_outputs_psmnet = tensor2float(scalar_outputs_psmnet)
-                avg_train_scalars_gan.update(scalar_outputs_gan)
                 avg_train_scalars_psmnet.update(scalar_outputs_psmnet)
                 if do_summary:
-                    # Update GAN images
-                    save_images_grid(summary_writer, 'train_gan', img_outputs_gan, global_step)
-                    # Update GAN losses
-                    scalar_outputs_gan.update({'lr_G': gan_model.optimizer_G.param_groups[0]['lr']})
-                    scalar_outputs_gan.update({'lr_D': gan_model.optimizer_D.param_groups[0]['lr']})
-                    save_scalars_graph(summary_writer, 'train_gan', scalar_outputs_gan, global_step)
                     # Update reprojection images
                     save_images_grid(summary_writer, 'train_reproj', img_output_reproj, global_step, nrow=3)
                     save_scalars(summary_writer, 'train_reproj', scalar_outputs_reproj, global_step)
@@ -123,23 +111,15 @@ def train(transformer_model, gan_model, psmnet_model, transformer_optimizer, psm
                     checkpoint_data = {
                         'epoch': epoch_idx,
                         'Transformer': transformer_model.state_dict(),
-                        'G_A': gan_model.netG_A.state_dict(),
-                        'G_B': gan_model.netG_B.state_dict(),
-                        'D_A': gan_model.netD_A.state_dict(),
-                        'D_B': gan_model.netD_B.state_dict(),
                         'PSMNet': psmnet_model.state_dict(),
                         'optimizerTransformer': transformer_optimizer.state_dict(),
-                        'optimizerG': gan_model.optimizer_G.state_dict(),
-                        'optimizerD': gan_model.optimizer_D.state_dict(),
                         'optimizerPSMNet': psmnet_optimizer.state_dict()
                     }
                     save_filename = os.path.join(args.logdir, 'models', f'model_{global_step}.pth')
                     torch.save(checkpoint_data, save_filename)
 
                     # Get average results among all batches
-                    total_err_metric_gan = avg_train_scalars_gan.mean()
                     total_err_metric_psmnet = avg_train_scalars_psmnet.mean()
-                    logger.info(f'Step {global_step} train gan    : {total_err_metric_gan}')
                     logger.info(f'Step {global_step} train psmnet: {total_err_metric_psmnet}')
         gc.collect()
 
@@ -193,20 +173,20 @@ def train(transformer_model, gan_model, psmnet_model, transformer_optimizer, psm
         # gc.collect()
 
 
-def train_sample(sample, transformer_model, gan_model, psmnet_model,
+def train_sample(sample, transformer_model, psmnet_model,
                  transformer_optimizer, psmnet_optimizer, isTrain=True):
     if isTrain:
         transformer_model.train()
-        gan_model.train()
         psmnet_model.train()
     else:
         transformer_model.eval()
-        gan_model.eval()
         psmnet_model.eval()
 
     # Load data
     img_L = sample['img_L'].to(cuda_device)  # [bs, 3, H, W]
-    img_R = sample['img_R'].to(cuda_device)  # [bs, 3, H, W]
+    img_R = sample['img_R'].to(cuda_device)
+    img_L_ir_pattern = sample['img_L_ir_pattern'].to(cuda_device)  # [bs, 1, H, W]
+    img_R_ir_pattern = sample['img_R_ir_pattern'].to(cuda_device)
     img_real_L = sample['img_real_L'].to(cuda_device)  # [bs, 3, 2H, 2W]
     img_real_R = sample['img_real_R'].to(cuda_device)  # [bs, 3, 2H, 2W]
     img_real_L = F.interpolate(img_real_L, scale_factor=0.5, mode='bilinear',
@@ -217,25 +197,6 @@ def train_sample(sample, transformer_model, gan_model, psmnet_model,
     # Train on simple Transformer
     img_L_transformed, img_R_transformed, img_real_L_transformed, img_real_R_transformed \
         = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
-
-    # Train on GAN
-    input_sample = {'img_L': img_L_transformed.detach(), 'img_R': img_R_transformed.detach(),
-                    'img_real_L': img_real_L_transformed.detach(), 'img_real_R': img_real_R_transformed.detach()}
-    gan_model.set_input(input_sample)
-    if isTrain:
-        gan_model.forward()
-    else:
-            with torch.no_grad():
-                gan_model.forward()
-
-    # Backward on GAN
-    if isTrain:
-        # Update GAN
-        gan_model.optimize_parameters()
-    else:
-        gan_model.compute_loss_G()
-        gan_model.compute_loss_D_A()
-        gan_model.compute_loss_D_B()
 
     # Train on PSMNet
     disp_gt = sample['img_disp_l'].to(cuda_device)
@@ -259,6 +220,7 @@ def train_sample(sample, transformer_model, gan_model, psmnet_model,
 
     # Get stereo loss on sim
     mask = (disp_gt < cfg.ARGS.MAX_DISP) * (disp_gt > 0)  # Note in training we do not exclude bg
+    mask.detach()
     if isTrain:
         pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
         sim_pred_disp = pred_disp3
@@ -270,18 +232,18 @@ def train_sample(sample, transformer_model, gan_model, psmnet_model,
             pred_disp = psmnet_model(img_L_transformed, img_R_transformed)
             loss_psmnet = F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
 
-    # Get reprojection loss on sim
-    sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, sim_pred_disp, disp_gt)
+    # Get reprojection loss on sim_ir_pattern
+    # sim_ir_reproj_loss, sim_ir_warped, sim_ir_reproj_mask = get_reprojection_error(img_L_ir_pattern, img_R_ir_pattern, disp_gt)
+    sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, sim_pred_disp, mask)
     # sim_img_transformed_reproj_loss, sim_img_transformed_warped = get_reprojection_error(img_L_transformed, img_R_transformed, sim_pred_disp)
 
-    # Backward on sim
+    # Backward on sim_ir_pattern reprojection
     # sim_loss_reproj = (sim_img_reproj_loss + sim_img_transformed_reproj_loss * 0.1) * 0.0001
     # sim_loss = (loss_psmnet + sim_loss_reproj) / 2
     sim_loss = loss_psmnet + sim_img_reproj_loss
     if isTrain:
         transformer_optimizer.zero_grad()
         psmnet_optimizer.zero_grad()
-        # sim_loss.backward()
         sim_loss.backward()
         psmnet_optimizer.step()
         transformer_optimizer.step()
@@ -289,93 +251,40 @@ def train_sample(sample, transformer_model, gan_model, psmnet_model,
     # Get reprojection loss on real
     img_L_transformed, img_R_transformed, img_real_L_transformed, img_real_R_transformed \
         = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
-
-    # TODO no backward on GAN here
-    input_sample = {'img_L': img_L_transformed.detach(), 'img_R': img_R_transformed.detach(),
-                    'img_real_L': img_real_L_transformed.detach(), 'img_real_R': img_real_R_transformed.detach()}
-    gan_model.set_input(input_sample)
-    with torch.no_grad():
-        gan_model.forward()
-    img_real_L_transformed_gan = gan_model.fake_A_L.detach()
-    img_real_R_transformed_gan = gan_model.fake_A_R.detach()
-
     if isTrain:
-        # pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
-        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed_gan, img_real_R_transformed_gan)
+        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
         real_pred_disp = pred_disp3
     else:
         with torch.no_grad():
-            # real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
-            real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed_gan, img_real_R_transformed_gan)
-    real_img_reproj_loss, real_img_warped, real_img_reproj_mask = get_reprojection_error(img_real_L, img_real_R, real_pred_disp, disp_gt)
+            real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
+    real_img_reproj_loss, real_img_warped, real_img_reproj_mask = get_reprojection_error(img_real_L, img_real_R, real_pred_disp)
     # real_img_transformed_reproj_loss, real_img_transformed_warped = get_reprojection_error(img_real_L_transformed, img_real_R_transformed, real_pred_disp)
 
     # Backward on real
-    # real_loss_reproj = (real_img_reproj_loss + real_img_transformed_reproj_loss * 0.1) * 0.0001
-    # real_loss_reproj = real_img_reproj_loss / 2
-    real_loss = real_img_reproj_loss
     if isTrain:
         transformer_optimizer.zero_grad()
         psmnet_optimizer.zero_grad()
-        # real_loss_reproj.backward()
-        real_loss.backward()
+        real_img_reproj_loss.backward()
         psmnet_optimizer.step()
         transformer_optimizer.step()
 
-    # Save gan scalar outputs and images
-    scalar_outputs_gan = {
-        'G_A': gan_model.loss_G_A, 'G_B': gan_model.loss_G_B,
-        'cycle_A': gan_model.loss_cycle_A, 'cycle_B': gan_model.loss_cycle_B,
-        'idt_A': gan_model.loss_idt_A, 'idt_B': gan_model.loss_idt_B,
-        'D_A': gan_model.loss_D_A, 'D_B': gan_model.loss_D_B
-    }
-    img_outputs_gan = {
-        'img_L': {
-            'orig': img_L, 'input': gan_model.real_A_L, 'fake': gan_model.fake_B_L,
-            'rec': gan_model.rec_A_L, 'idt': gan_model.idt_B_L
-        },
-        'img_R': {
-            'orig': img_R, 'input': gan_model.real_A_R, 'fake': gan_model.fake_B_R,
-            'rec': gan_model.rec_A_R, 'idt': gan_model.idt_B_R
-        },
-        'img_Real_L': {
-            'orig': img_real_L, 'input': gan_model.real_B_L, 'fake': gan_model.fake_A_L,
-            'rec': gan_model.rec_B_L, 'idt': gan_model.idt_A_L
-        },
-        'img_Real_R': {
-            'orig': img_real_R, 'input': gan_model.real_B_R, 'fake': gan_model.fake_A_R,
-            'rec': gan_model.rec_B_R, 'idt': gan_model.idt_A_R
-        }
-    }
-
     # Save reprojection outputs and images
     img_output_reproj = {
-        'sim_img_reprojection': {
-            'R': img_R, 'R_warped': sim_img_warped, 'mask': sim_img_reproj_mask
+        'sim_reprojection': {
+            'R': img_L, 'R_warped': sim_img_warped, 'mask': sim_img_reproj_mask
         },
-        'real_img_reprojection': {
-            'R': img_real_R, 'R_warped': real_img_warped, 'mask': real_img_reproj_mask
+        'real_reprojection': {
+            'R': img_real_L, 'R_warped': real_img_warped, 'mask': real_img_reproj_mask
         }
-        # 'sim_img_reprojection': {
-        #     'R': img_R, 'R_warped': sim_img_warped, 'R_transformed': img_R_transformed,
-        #     'R_transformed_warped': sim_img_transformed_warped
-        # },
-        # 'real_img_reprojection': {
-        #     'R': img_real_R, 'R_warped': real_img_warped, 'R_transformed': img_real_R_transformed,
-        #     'R_transformed_warped': real_img_transformed_warped
-        # }
     }
-    scalar_outputs_reproj = {'sim_img_reproj_loss': sim_img_reproj_loss.item(),
-                             'real_img_reproj_loss': real_img_reproj_loss.item()}
+    scalar_outputs_reproj = {'sim_reproj_loss': sim_img_reproj_loss.item(),
+                             'real_reproj_loss:': real_img_reproj_loss.item()}
 
-    # scalar_outputs_reproj = {'sim_img_reproj_loss': sim_img_reproj_loss.item(),
-    #                          'sim_img_transformed_reproj_loss': sim_img_transformed_reproj_loss.item(),
-    #                          'real_img_reproj_loss': real_img_reproj_loss.item(),
-    #                          'real_img_transformed_reproj_loss': real_img_transformed_reproj_loss.item()}
 
     # Compute stereo error metrics on sim
     pred_disp = sim_pred_disp
     scalar_outputs_psmnet = {'loss': loss_psmnet.item()}
+    scalar_outputs_psmnet.update(scalar_outputs_reproj)
     err_metrics = compute_err_metric(disp_gt,
                                      depth_gt,
                                      pred_disp,
@@ -393,10 +302,8 @@ def train_sample(sample, transformer_model, gan_model, psmnet_model,
     }
 
     if is_distributed:
-        scalar_outputs_gan = reduce_scalar_outputs(scalar_outputs_gan, cuda_device)
         scalar_outputs_psmnet = reduce_scalar_outputs(scalar_outputs_psmnet, cuda_device)
-    return scalar_outputs_gan, scalar_outputs_reproj, scalar_outputs_psmnet, \
-           img_outputs_gan, img_outputs_psmnet, img_output_reproj
+    return scalar_outputs_reproj, scalar_outputs_psmnet, img_outputs_psmnet, img_output_reproj
 
 
 if __name__ == '__main__':
@@ -431,11 +338,6 @@ if __name__ == '__main__':
     else:
         transformer_model = torch.nn.DataParallel(transformer_model)
 
-    # Create GAN model
-    gan_model = CycleGANModel()
-    gan_model.set_device(cuda_device)
-    gan_model.set_distributed(is_distributed=is_distributed, local_rank=args.local_rank)
-
     # Create PSMNet model
     psmnet_model = PSMNet(maxdisp=cfg.ARGS.MAX_DISP).to(cuda_device)
     psmnet_optimizer = torch.optim.Adam(psmnet_model.parameters(), lr=cfg.SOLVER.LR_CASCADE, betas=(0.9, 0.999))
@@ -446,4 +348,4 @@ if __name__ == '__main__':
         psmnet_model = torch.nn.DataParallel(psmnet_model)
 
     # Start training
-    train(transformer_model, gan_model, psmnet_model, transformer_optimizer, psmnet_optimizer, TrainImgLoader, ValImgLoader)
+    train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimizer, TrainImgLoader, ValImgLoader)

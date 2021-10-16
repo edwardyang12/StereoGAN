@@ -16,10 +16,17 @@ from utils.config import cfg
 from utils.util import load_pickle
 
 
-def gamma_trans(img, gamma):
-    gamma_table = [np.power(x/255.0, gamma)*255.0 for x in range(256)]
+def __gamma_trans__(img, gamma):
+    gamma_table = [np.power(x / 255.0, gamma) * 255.0 for x in range(256)]
     gamma_table = np.round(np.array(gamma_table)).astype(np.uint8)
     return cv2.LUT(img, gamma_table)
+
+
+def __get_ir_pattern__(img_ir: np.array, img: np.array, threshold=0.01):
+    diff = np.abs(img_ir - img)
+    ir = np.zeros_like(diff)
+    ir[diff > threshold] = 1
+    return ir
 
 
 def __data_augmentation__(gaussian_blur=False, color_jitter=False):
@@ -56,7 +63,7 @@ def __data_augmentation__(gaussian_blur=False, color_jitter=False):
     return custom_augmentation
 
 
-def __get_split_files__(split_file, debug=False, sub=100, isTest=False, onReal=False):
+def __get_split_files__(split_file, debug=False, sub=100, isTest=False):
     """
     :param split_file: Path to the split .txt file, e.g. train.txt
     :param debug: Debug mode, load less data
@@ -65,17 +72,15 @@ def __get_split_files__(split_file, debug=False, sub=100, isTest=False, onReal=F
     :param onReal: Whether test on real dataset, folder and file names are different
     :return: Lists of paths to the entries listed in split file
     """
-    dataset = cfg.REAL.DATASET if onReal else cfg.DIR.DATASET
-    img_left_name = cfg.REAL.LEFT if onReal else cfg.SPLIT.LEFT
-    img_right_name = cfg.REAL.RIGHT if onReal else cfg.SPLIT.RIGHT
-
     with open(split_file, 'r') as f:
         prefix = [line.strip() for line in f]
         if isTest is False:
             np.random.shuffle(prefix)
 
-        img_L = [os.path.join(dataset, p, img_left_name) for p in prefix]
-        img_R = [os.path.join(dataset, p, img_right_name) for p in prefix]
+        img_L = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.LEFT) for p in prefix]
+        img_R = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.RIGHT) for p in prefix]
+        img_L_no_ir = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.LEFT_NO_IR) for p in prefix]
+        img_R_no_ir = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.RIGHT_NO_IR) for p in prefix]
         img_depth_l = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHL) for p in prefix]
         img_depth_r = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHR) for p in prefix]
         img_meta = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.META) for p in prefix]
@@ -84,20 +89,22 @@ def __get_split_files__(split_file, debug=False, sub=100, isTest=False, onReal=F
         if debug is True:
             img_L = img_L[:sub]
             img_R = img_R[:sub]
+            img_L_no_ir = img_L_no_ir[:sub]
+            img_R_no_ir = img_R_no_ir[:sub]
             img_depth_l = img_depth_l[:sub]
             img_depth_r = img_depth_r[:sub]
             img_meta = img_meta[:sub]
             img_label = img_label[:sub]
 
-    # If training with pix2pix + cascade, load real dataset as input to the discriminator
+    # If training, load real dataset as input to the discriminator
     if isTest is False:
         img_real_list = os.listdir(cfg.REAL.DATASET)
         img_real_list = [folder_name for folder_name in img_real_list if folder_name[0] in ['0', '1']]
         img_real_L = [os.path.join(cfg.REAL.DATASET, folder_name, cfg.REAL.LEFT) for folder_name in img_real_list]
         img_real_R = [os.path.join(cfg.REAL.DATASET, folder_name, cfg.REAL.RIGHT) for folder_name in img_real_list]
-        return img_L, img_R, img_depth_l, img_depth_r, img_meta, img_label, img_real_L, img_real_R
+        return img_L, img_R, img_L_no_ir, img_R_no_ir, img_depth_l, img_depth_r, img_meta, img_label, img_real_L, img_real_R
     else:
-        return img_L, img_R, img_depth_l, img_depth_r, img_meta, img_label
+        return img_L, img_R, img_L_no_ir, img_R_no_ir, img_depth_l, img_depth_r, img_meta, img_label
 
 
 class MessytableDataset(Dataset):
@@ -109,8 +116,9 @@ class MessytableDataset(Dataset):
         :param debug: Debug mode, load less data
         :param sub: If debug mode is enabled, sub will be the number of data loaded
         """
-        self.img_L, self.img_R, self.img_depth_l, self.img_depth_r, self.img_meta, self.img_label, self.img_real_L,\
-            self.img_real_R = __get_split_files__(split_file, debug, sub, isTest=False)
+        self.img_L, self.img_R, self.img_L_no_ir, self.img_R_no_ir, self.img_depth_l, self.img_depth_r, \
+            self.img_meta, self.img_label, self.img_real_L, self.img_real_R \
+            = __get_split_files__(split_file, debug, sub, isTest=False)
         self.gaussian_blur = gaussian_blur
         self.color_jitter = color_jitter
         self.real_len = len(self.img_real_L)
@@ -119,27 +127,29 @@ class MessytableDataset(Dataset):
         return len(self.img_L)
 
     def __getitem__(self, idx):
-        img_L_rgb = np.array(Image.open(self.img_L[idx]))[:, :, :-1]   # [H, W, 3]
-        img_R_rgb = np.array(Image.open(self.img_R[idx]))[:, :, :-1]   # [H, W, 3]
-        img_depth_l = np.array(Image.open(self.img_depth_l[idx])) / 1000    # convert from mm to m
-        img_depth_r = np.array(Image.open(self.img_depth_r[idx])) / 1000    # convert from mm to m
+        img_L = np.array(Image.open(self.img_L[idx]).convert(mode='L')) / 255  # [H, W]
+        img_R = np.array(Image.open(self.img_R[idx]).convert(mode='L')) / 255
+        img_L_no_ir = np.array(Image.open(self.img_L_no_ir[idx]).convert(mode='L')) / 255
+        img_R_no_ir = np.array(Image.open(self.img_R_no_ir[idx]).convert(mode='L')) / 255
+        img_L_ir_pattern = __get_ir_pattern__(img_L, img_L_no_ir)  # [H, W]
+        img_R_ir_pattern = __get_ir_pattern__(img_R, img_R_no_ir)
+        img_L_rgb = np.repeat(img_L[:, :, None], 3, axis=-1)
+        img_R_rgb = np.repeat(img_R[:, :, None], 3, axis=-1)
+
+        img_depth_l = np.array(Image.open(self.img_depth_l[idx])) / 1000  # convert from mm to m
+        img_depth_r = np.array(Image.open(self.img_depth_r[idx])) / 1000  # convert from mm to m
         img_meta = load_pickle(self.img_meta[idx])
 
         # Load real images
         real_idx = np.random.randint(0, high=self.real_len)
-        img_real_L_rgb = Image.open(self.img_real_L[real_idx]).convert(mode='L')
-        img_real_R_rgb = Image.open(self.img_real_R[real_idx]).convert(mode='L')
-        img_real_L_rgb = np.array(img_real_L_rgb)
-        img_real_R_rgb = np.array(img_real_R_rgb)
-        # img_real_L_rgb = gamma_trans(np.array(img_real_L_rgb), 0.25)
-        # img_real_R_rgb = gamma_trans(np.array(img_real_R_rgb), 0.25)
-        img_real_L_rgb = np.repeat(img_real_L_rgb[:, :, None], 3, axis=-1)
-        img_real_R_rgb = np.repeat(img_real_R_rgb[:, :, None], 3, axis=-1)
-
-        # img_real_L_rgb = np.array(Image.open(self.img_real_L[real_idx]))[:, :, None]
-        # img_real_L_rgb = np.repeat(img_real_L_rgb, 3, axis=-1)  # [H, W, 3]
-        # img_real_R_rgb = np.array(Image.open(self.img_real_R[real_idx]))[:, :, None]
-        # img_real_R_rgb = np.repeat(img_real_R_rgb, 3, axis=-1)  # [H, W, 3]
+        img_real_L = Image.open(self.img_real_L[real_idx]).convert(mode='L')
+        img_real_R = Image.open(self.img_real_R[real_idx]).convert(mode='L')
+        # img_real_L = np.array(img_real_L)
+        # img_real_R = np.array(img_real_R)
+        img_real_L = __gamma_trans__(np.array(img_real_L), 0.5)
+        img_real_R = __gamma_trans__(np.array(img_real_R), 0.5)
+        img_real_L_rgb = np.repeat(img_real_L[:, :, None], 3, axis=-1)
+        img_real_R_rgb = np.repeat(img_real_R[:, :, None], 3, axis=-1)
 
         # Convert depth map to disparity map
         extrinsic_l = img_meta['extrinsic_l']
@@ -155,18 +165,20 @@ class MessytableDataset(Dataset):
         img_disp_r = np.zeros_like(img_depth_r)
         img_disp_r[mask] = focal_length * baseline / img_depth_r[mask]
 
-        # random crop the image to 256 * 512
+        # random crop the image to CROP_HEIGHT * CROP_WIDTH
         h, w = img_L_rgb.shape[:2]
         th, tw = cfg.ARGS.CROP_HEIGHT, cfg.ARGS.CROP_WIDTH
         x = random.randint(0, h - th)
         y = random.randint(0, w - tw)
-        img_L_rgb = img_L_rgb[x:(x+th), y:(y+tw)]
-        img_R_rgb = img_R_rgb[x:(x+th), y:(y+tw)]
-        img_disp_l = img_disp_l[2*x: 2*(x+th), 2*y: 2*(y+tw)]  # depth original res in 1080*1920
-        img_depth_l = img_depth_l[2*x: 2*(x+th), 2*y: 2*(y+tw)]
-        img_disp_r = img_disp_r[2*x: 2*(x+th), 2*y: 2*(y+tw)]
-        img_depth_r = img_depth_r[2*x: 2*(x+th), 2*y: 2*(y+tw)]
-        img_real_L_rgb = img_real_L_rgb[2*x: 2*(x+th), 2*y: 2*(y+tw)]  # real original res in 1080*1920
+        img_L_rgb = img_L_rgb[x:(x + th), y:(y + tw)]
+        img_R_rgb = img_R_rgb[x:(x + th), y:(y + tw)]
+        img_L_ir_pattern = img_L_ir_pattern[x:(x + th), y:(y + tw)]
+        img_R_ir_pattern = img_R_ir_pattern[x:(x + th), y:(y + tw)]
+        img_disp_l = img_disp_l[2 * x: 2 * (x + th), 2 * y: 2 * (y + tw)]  # depth original res in 1080*1920
+        img_depth_l = img_depth_l[2 * x: 2 * (x + th), 2 * y: 2 * (y + tw)]
+        img_disp_r = img_disp_r[2 * x: 2 * (x + th), 2 * y: 2 * (y + tw)]
+        img_depth_r = img_depth_r[2 * x: 2 * (x + th), 2 * y: 2 * (y + tw)]
+        img_real_L_rgb = img_real_L_rgb[2 * x: 2 * (x + th), 2 * y: 2 * (y + tw)]  # real original res in 1080*1920
         img_real_R_rgb = img_real_R_rgb[2 * x: 2 * (x + th), 2 * y: 2 * (y + tw)]
 
         # Get data augmentation
@@ -176,6 +188,8 @@ class MessytableDataset(Dataset):
         item = {}
         item['img_L'] = custom_augmentation(img_L_rgb).type(torch.FloatTensor)
         item['img_R'] = custom_augmentation(img_R_rgb).type(torch.FloatTensor)
+        item['img_L_ir_pattern'] = torch.tensor(img_L_ir_pattern, dtype=torch.float32).unsqueeze(0)
+        item['img_R_ir_pattern'] = torch.tensor(img_R_ir_pattern, dtype=torch.float32).unsqueeze(0)
         item['img_real_L'] = normalization(img_real_L_rgb).type(torch.FloatTensor)
         item['img_real_R'] = normalization(img_real_R_rgb).type(torch.FloatTensor)
         item['img_disp_l'] = torch.tensor(img_disp_l, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W] in dataloader
@@ -197,3 +211,4 @@ if __name__ == '__main__':
     print(item['img_disp_l'].shape)
     print(item['prefix'])
     print(item['img_real_L'].shape)
+    print(item['img_L_ir_pattern'].shape)
