@@ -63,15 +63,17 @@ class FastGradientSignUntargeted():
         # original_images: values are within self.min_val and self.max_val
 
         change = torch.abs(input_R_warped - imgR)
+        change.clamp_(0.01, 2)
         # The adversaries created from random close points to the original data
         distribution = uniform.Uniform(-change, change)
-        rand_perturbR = distribution.sample(imgR.shape)
+        rand_perturbR = distribution.sample()
         rand_perturbR = rand_perturbR.cuda()
 
         change = torch.abs(input_L_warped - imgL)
+        change.clamp_(0.01, 2)
         # The adversaries created from random close points to the original data
         distribution = uniform.Uniform(-change, change)
-        rand_perturbL = distribution.sample(imgR.shape)
+        rand_perturbL = distribution.sample()
         rand_perturbL = rand_perturbR.cuda()
 
         xL = imgL + rand_perturbL
@@ -87,9 +89,6 @@ class FastGradientSignUntargeted():
 
         xL.requires_grad = True
         xR.requires_grad = True
-        xLT.requires_grad = True
-        xRT.requires_grad = True
-
 
         with torch.enable_grad():
             for _iter in range(self.max_iters):

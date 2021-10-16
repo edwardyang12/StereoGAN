@@ -17,12 +17,13 @@ from nets.psmnet import PSMNet
 from nets.transformer import Transformer
 from utils.cascade_metrics import compute_err_metric
 from utils.warp_ops import apply_disparity_cu
-from utils.reprojection import get_reprojection_error
+from utils.reprojection import get_reprojection_error, apply_disparity
 from utils.config import cfg
 from utils.reduce import set_random_seed, synchronize, AverageMeterDict, \
     tensor2float, tensor2numpy, reduce_scalar_outputs, make_nograd_func
 from utils.util import setup_logger, weights_init, \
     adjust_learning_rate, save_scalars, save_scalars_graph, save_images, save_images_grid, disp_error_img
+from nets.FGSM import FastGradientSignUntargeted
 
 cudnn.benchmark = True
 
@@ -184,9 +185,8 @@ def train_sample(sample, transformer_model, psmnet_model,
     adv_L, adv_R = 0, 0
     loss_psmnet = 0
     if isTrain and adv_train:
-        input_R_warped = apply_disparity(input_L, sim_pred_disp)
-        input_L_warped = apply_disparity(input_R, sim_pred_disp)
-        adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_R_warped, mask)
+        input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
+        adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask)
         pred_disp1, pred_disp2, pred_disp3 = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
         pred_disp = pred_disp3
         loss_psmnet = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
@@ -279,7 +279,7 @@ def train_sample(sample, transformer_model, psmnet_model,
         'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
         'disp_pred': pred_disp[[0]].repeat([1, 3, 1, 1]),
         'disp_err': pred_disp_err_tensor,
-        'adv_L': adv_L[[0]],
+        'adv_L': adv_L[[0]], # [B,3,H,W] or [0,1] or [0,255]
         'adv_LT': adv_LT[[0]],
         'img_L': img_L[[0]],
     }
