@@ -185,7 +185,7 @@ def train_sample(sample, transformer_model, psmnet_model,
     loss_psmnet = 0
     if isTrain and adv_train:
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
-        input_L_warped = input_L_warped.detach()
+        input_L_warped = input_L_warped.detach().clone()
         adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask)
         pred_disp1, pred_disp2, pred_disp3 = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
         pred_disp = pred_disp3
@@ -203,7 +203,7 @@ def train_sample(sample, transformer_model, psmnet_model,
     # Backward on sim
     # sim_loss_reproj = (sim_img_reproj_loss + sim_img_transformed_reproj_loss * 0.1) * 0.0001
     # sim_loss = (loss_psmnet + sim_loss_reproj) / 2
-    sim_loss =  sim_img_reproj_loss
+    sim_loss = loss_psmnet + sim_img_reproj_loss
     if isTrain:
         transformer_optimizer.zero_grad()
         psmnet_optimizer.zero_grad()
