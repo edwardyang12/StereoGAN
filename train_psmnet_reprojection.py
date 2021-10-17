@@ -251,11 +251,11 @@ def train_sample(sample, transformer_model, psmnet_model,
     img_L_transformed, img_R_transformed, img_real_L_transformed, img_real_R_transformed \
         = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
     if isTrain:
-        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
+        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
         real_pred_disp = pred_disp3
     else:
         with torch.no_grad():
-            real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
+            real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
     real_img_reproj_loss, real_img_warped, real_img_reproj_mask = get_reprojection_error(img_real_L, img_real_R, real_pred_disp)
     # real_img_transformed_reproj_loss, real_img_transformed_warped = get_reprojection_error(img_real_L_transformed, img_real_R_transformed, real_pred_disp)
 

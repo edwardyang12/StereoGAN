@@ -54,9 +54,9 @@ def __data_augmentation__(gaussian_blur=False, color_jitter=False):
         ]
     # Normalization
     transform_list += [
-        Transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225],
+        Transforms.Normalize( # adjust so everything between [-2,2]
+            mean=[0.5, 0.5, 0.5],
+            std=[0.25, 0.25, 0.25],
         )
     ]
     custom_augmentation = Transforms.Compose(transform_list)

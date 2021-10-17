@@ -147,8 +147,7 @@ def train_sample(sample, transformer_model, psmnet_model,
                              recompute_scale_factor=False, align_corners=False)
 
     # Train on simple Transformer
-    img_L_transformed, img_R_transformed, img_real_L_transformed, img_real_R_transformed \
-        = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
+    img_L_transformed, img_R_transformed, _, _ = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
 
     # Train on PSMNet
     disp_gt = sample['img_disp_l'].to(cuda_device)
@@ -172,7 +171,7 @@ def train_sample(sample, transformer_model, psmnet_model,
 
     # Get stereo loss on sim
     mask = (disp_gt < cfg.ARGS.MAX_DISP) * (disp_gt > 0)  # Note in training we do not exclude bg
-    mask.detach()
+    mask = mask.detach()
     sim_pred_disp = 0
     if isTrain:
         _, _, pred_disp3 = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
@@ -186,6 +185,7 @@ def train_sample(sample, transformer_model, psmnet_model,
     loss_psmnet = 0
     if isTrain and adv_train:
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
+        input_L_warped = input_L_warped.detach()
         adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask)
         pred_disp1, pred_disp2, pred_disp3 = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
         pred_disp = pred_disp3
@@ -212,14 +212,14 @@ def train_sample(sample, transformer_model, psmnet_model,
         transformer_optimizer.step()
 
     # Get reprojection loss on real
-    img_L_transformed, img_R_transformed, img_real_L_transformed, img_real_R_transformed \
+    _, _, img_real_L_transformed, img_real_R_transformed \
         = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
     if isTrain:
-        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
+        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
         real_pred_disp = pred_disp3
     else:
         with torch.no_grad():
-            real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
+            real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
     real_img_reproj_loss, real_img_warped, real_img_reproj_mask = get_reprojection_error(img_real_L, img_real_R, real_pred_disp)
     # real_img_transformed_reproj_loss, real_img_transformed_warped = get_reprojection_error(img_real_L_transformed, img_real_R_transformed, real_pred_disp)
 
