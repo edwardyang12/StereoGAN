@@ -203,7 +203,7 @@ def train_sample(sample, transformer_model, psmnet_model,
     # Backward on sim
     # sim_loss_reproj = (sim_img_reproj_loss + sim_img_transformed_reproj_loss * 0.1) * 0.0001
     # sim_loss = (loss_psmnet + sim_loss_reproj) / 2
-    sim_loss = loss_psmnet + sim_img_reproj_loss
+    sim_loss = loss_psmnet # + sim_img_reproj_loss
     if isTrain:
         transformer_optimizer.zero_grad()
         psmnet_optimizer.zero_grad()
