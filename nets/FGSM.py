@@ -5,6 +5,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.distributions import uniform
+from torch.autograd import Variable
 
 def project(x, original_x, epsilon, _type='linf'):
 
@@ -74,21 +75,21 @@ class FastGradientSignUntargeted():
         # The adversaries created from random close points to the original data
         distribution = uniform.Uniform(-change, change)
         rand_perturbL = distribution.sample()
-        rand_perturbL = rand_perturbR.cuda()
+        rand_perturbL = rand_perturbL.cuda()
 
-        xL = imgL + rand_perturbL
+        xL = Variable(imgL.data, requires_grad=True).cuda()
+        xL = xL + rand_perturbL
         xL.clamp_(self.min_val, self.max_val)
-        xR = imgR + rand_perturbR
+        xR = Variable(imgR.data, requires_grad=True).cuda()
+        xR = xR + rand_perturbR
         xR.clamp_(self.min_val, self.max_val)
 
-        xLT = img_L_transformed + rand_perturbL
+        xLT = Variable(img_L_transformed.data, requires_grad=True).cuda()
+        xLT = xLT + rand_perturbL
         xLT.clamp_(self.min_val, self.max_val)
-        xRT = img_R_transformed + rand_perturbR
+        xRT = Variable(img_R_transformed.data, requires_grad=True).cuda()
+        xRT = xRT + rand_perturbR
         xRT.clamp_(self.min_val, self.max_val)
-
-
-        xL.requires_grad = True
-        xR.requires_grad = True
 
         with torch.enable_grad():
             for _iter in range(self.max_iters):
@@ -112,7 +113,10 @@ class FastGradientSignUntargeted():
                 xLT = self.aug(xLT, img_L_transformed, loss, grad_outputs)
                 xRT = self.aug(xRT, img_R_transformed, loss, grad_outputs)
 
-        return xL, xR, xLT, xRT
+                self.model.zero_grad()
+        img_L_transformed.data = xLT.data
+        img_R_transformed.data = xRT.data
+        return xL, xR, img_L_transformed, img_R_transformed
 
     def aug(self, x, img, loss,grad_outputs):
         grads = torch.autograd.grad(loss, x, grad_outputs=grad_outputs,
@@ -120,4 +124,5 @@ class FastGradientSignUntargeted():
         x.data += self.alpha * torch.sign(grads.data)
         x = project(x,img,self.epsilon, self._type)
         x.clamp_(self.min_val, self.max_val)
+        x = Variable(x.data, requires_grad=True)
         return x
