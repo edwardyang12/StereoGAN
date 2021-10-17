@@ -172,14 +172,11 @@ def train_sample(sample, transformer_model, psmnet_model,
     # Get stereo loss on sim
     mask = (disp_gt < cfg.ARGS.MAX_DISP) * (disp_gt > 0)  # Note in training we do not exclude bg
     mask = mask.detach()
-    sim_pred_disp = 0
+    sim_pred_disp, pred_disp = 0,0
     if isTrain:
         _, _, pred_disp3 = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
         sim_pred_disp = pred_disp3
-
-    # Get reprojection loss on sim
-    sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, sim_pred_disp, mask)
-    # sim_img_transformed_reproj_loss, sim_img_transformed_warped = get_reprojection_error(img_L_transformed, img_R_transformed, sim_pred_disp)
+        psmnet_model.zero_grad()
 
     adv_L, adv_R = 0, 0
     loss_psmnet = 0
@@ -199,6 +196,9 @@ def train_sample(sample, transformer_model, psmnet_model,
         loss_psmnet = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
                + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
                + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
+
+    # Get reprojection loss on sim
+    sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, pred_disp, mask)
 
     # Backward on sim
     # sim_loss_reproj = (sim_img_reproj_loss + sim_img_transformed_reproj_loss * 0.1) * 0.0001
