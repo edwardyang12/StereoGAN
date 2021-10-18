@@ -100,6 +100,9 @@ class FastGradientSignUntargeted():
                     loss = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
                            + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
                            + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
+                else:
+                    pred_disp = self.model(xL, xR, xLT, xRT)
+                    loss = F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
 
                 if reduction4loss == 'none':
                     grad_outputs = torch.ones(loss.shape).cuda()

@@ -125,6 +125,48 @@ def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimiz
                     logger.info(f'Step {global_step} train psmnet: {total_err_metric_psmnet}')
         gc.collect()
 
+        # One epoch validation loop
+        avg_val_scalars_std = AverageMeterDict()
+        avg_val_scalars_adv = AverageMeterDict()
+        for batch_idx, sample in enumerate(ValImgLoader):
+            global_step = (len(ValImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE
+            do_summary = global_step % args.summary_freq == 0
+            scalar_outputs_reproj, scalar_outputs_std, img_outputs_std, img_output_reproj, scalar_outputs_adv = \
+                train_sample(sample, transformer_model, psmnet_model,
+                             transformer_optimizer, psmnet_optimizer, attack, isTrain=False, adv_train=True)
+            if (not is_distributed) or (dist.get_rank() == 0):
+                scalar_outputs_std = tensor2float(scalar_outputs_std)
+                scalar_outputs_adv = tensor2float(scalar_outputs_adv)
+                avg_val_scalars_std.update(scalar_outputs_std)
+                avg_val_scalars_adv.update(scalar_outputs_adv)
+                if do_summary:
+                    save_images_grid(summary_writer, 'val_reproj', img_output_reproj, global_step, nrow=3)
+                    save_scalars(summary_writer, 'val_reproj', scalar_outputs_reproj, global_step)
+
+                    save_images(summary_writer, 'val_std', img_outputs_std, global_step)
+                    scalar_outputs_psmnet.update({'lr': psmnet_optimizer.param_groups[0]['lr']})
+                    save_scalars(summary_writer, 'val_std', scalar_outputs_std, global_step)
+                    save_scalars(summary_writer, 'val_adv', scalar_outputs_adv, global_step)
+
+        if (not is_distributed) or (dist.get_rank() == 0):
+            # Get average results among all batches
+            total_err_metric_psmnet = avg_val_scalars_std.mean()
+            logger.info(f'Epoch {epoch_idx} val std : {total_err_metric_psmnet}')
+
+            # Save best checkpoints
+            new_err = total_err_metric_psmnet['depth_abs_err'][0] if num_gpus > 1 \
+                else total_err_metric_psmnet['depth_abs_err']
+            if new_err < cur_err:
+                cur_err = new_err
+                checkpoint_data = {
+                    'epoch': epoch_idx,
+                    'PSMNet': psmnet_model.state_dict(),
+                    'optimizerPSMNet': psmnet_optimizer.state_dict()
+                }
+                save_filename = os.path.join(args.logdir, 'models', f'model_best.pth')
+                torch.save(checkpoint_data, save_filename)
+        gc.collect()
+
 
 def train_sample(sample, transformer_model, psmnet_model,
                  transformer_optimizer, psmnet_optimizer, attack, isTrain=True, adv_train=True):
@@ -201,11 +243,11 @@ def train_sample(sample, transformer_model, psmnet_model,
     elif not isTrain and adv_train:
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
         input_L_warped = input_L_warped.detach().clone()
-        adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask)
+        adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask, isTrain=False)
         pred_disp = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
 
         with torch.no_grad():
-            std_disp = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
+            std_disp = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
         std_loss = F.smooth_l1_loss(std_disp[mask], disp_gt[mask], reduction='mean')
         adv_loss = F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
 
@@ -213,7 +255,7 @@ def train_sample(sample, transformer_model, psmnet_model,
         pred_disp = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
         input_L_warped = input_L_warped.detach().clone()
-        adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask)
+        adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask, isTrain=False)
 
         with torch.no_grad():
             adv_disp = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
@@ -267,32 +309,105 @@ def train_sample(sample, transformer_model, psmnet_model,
     scalar_outputs_reproj = {'sim_reproj_loss': sim_img_reproj_loss.item(),
                              'real_reproj_loss': real_img_reproj_loss.item()}
 
-    # Compute stereo error metrics on sim
-    scalar_outputs_psmnet = {'loss': loss_psmnet.item()}
-    scalar_outputs_psmnet.update(scalar_outputs_reproj)
-    err_metrics = compute_err_metric(disp_gt,
-                                     depth_gt,
-                                     pred_disp,
-                                     img_focal_length,
-                                     img_baseline,
-                                     mask)
-    scalar_outputs_psmnet.update(err_metrics)
-    # Compute error images
-    pred_disp_err_np = disp_error_img(pred_disp[[0]], disp_gt[[0]], mask[[0]])
-    pred_disp_err_tensor = torch.from_numpy(np.ascontiguousarray(pred_disp_err_np[None].transpose([0, 3, 1, 2])))
-    img_outputs_psmnet = {
-        'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
-        'disp_pred': pred_disp[[0]].repeat([1, 3, 1, 1]),
-        'disp_err': pred_disp_err_tensor,
-        'adv_L': adv_L[[0]], # [B,3,H,W] or [0,1] or [0,255]
-        'adv_LT': adv_LT[[0]],
-        'img_LT': img_L_transformed[[0]],
-        'img_L': img_L[[0]],
-    }
+    if isTrain:
+        # Compute stereo error metrics on sim
+        scalar_outputs_psmnet = {'loss': loss_psmnet.item()}
+        scalar_outputs_psmnet.update(scalar_outputs_reproj)
+        err_metrics = compute_err_metric(disp_gt,
+                                         depth_gt,
+                                         pred_disp,
+                                         img_focal_length,
+                                         img_baseline,
+                                         mask)
+        scalar_outputs_psmnet.update(err_metrics)
+        # Compute error images
+        pred_disp_err_np = disp_error_img(pred_disp[[0]], disp_gt[[0]], mask[[0]])
+        pred_disp_err_tensor = torch.from_numpy(np.ascontiguousarray(pred_disp_err_np[None].transpose([0, 3, 1, 2])))
+        img_outputs_psmnet = {
+            'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
+            'disp_pred': pred_disp[[0]].repeat([1, 3, 1, 1]),
+            'disp_err': pred_disp_err_tensor,
+            'adv_L': adv_L[[0]], # [B,3,H,W] or [0,1] or [0,255]
+            'adv_LT': adv_LT[[0]],
+            'img_LT': img_L_transformed[[0]],
+            'img_L': img_L[[0]],
+        }
 
-    if is_distributed:
-        scalar_outputs_psmnet = reduce_scalar_outputs(scalar_outputs_psmnet, cuda_device)
-    return scalar_outputs_reproj, scalar_outputs_psmnet, img_outputs_psmnet, img_output_reproj
+        if is_distributed:
+            scalar_outputs_psmnet = reduce_scalar_outputs(scalar_outputs_psmnet, cuda_device)
+        return scalar_outputs_reproj, scalar_outputs_psmnet, img_outputs_psmnet, img_output_reproj
+    else:
+        scalar_outputs_std = {'std_loss': std_loss.item()}
+        scalar_outputs_adv = {'adv_loss': adv_loss.item()}
+        scalar_outputs_std.update(scalar_outputs_reproj)
+
+        if adv_train:
+            # Compute error images, select the first instance in the batch
+            pred_disp_err_adv = disp_error_img(pred_disp[[0]], disp_gt[[0]], mask[[0]])
+            pred_disp_err_adv = torch.from_numpy(np.ascontiguousarray(pred_disp_err_adv[None].transpose([0, 3, 1, 2])))
+            pred_disp_err_std = disp_error_img(std_disp[[0]], disp_gt[[0]], mask[[0]])
+            pred_disp_err_std = torch.from_numpy(np.ascontiguousarray(pred_disp_err_std[None].transpose([0, 3, 1, 2])))
+            img_outputs_std = {
+                'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
+                'disp_pred_adv': pred_disp[[0]].repeat([1, 3, 1, 1]),
+                'disp_err_adv': pred_disp_err_adv,
+                'disp_pred_std': std_disp[[0]].repeat([1, 3, 1, 1]),
+                'disp_err_std': pred_disp_err_std,
+                'adv_L': adv_L[[0]], # [B,3,H,W] or [0,1] or [0,255]
+                'adv_LT': adv_LT[[0]],
+                'img_LT': img_L_transformed[[0]],
+                'img_L': img_L[[0]],
+            }
+            err_metrics_std = compute_err_metric(disp_gt,
+                                             depth_gt,
+                                             std_disp,
+                                             img_focal_length,
+                                             img_baseline,
+                                             mask)
+            err_metrics_adv = compute_err_metric(disp_gt,
+                                             depth_gt,
+                                             pred_disp,
+                                             img_focal_length,
+                                             img_baseline,
+                                             mask)
+            scalar_outputs_std.update(err_metrics_std)
+            scalar_outputs_adv.update(err_metrics_adv)
+        else:
+            # Compute error images, select the first instance in the batch
+            pred_disp_err_std = disp_error_img(pred_disp[[0]], disp_gt[[0]], mask[[0]])
+            pred_disp_err_std = torch.from_numpy(np.ascontiguousarray(pred_disp_err_std[None].transpose([0, 3, 1, 2])))
+            pred_disp_err_adv = disp_error_img(adv_disp[[0]], disp_gt[[0]], mask[[0]])
+            pred_disp_err_adv = torch.from_numpy(np.ascontiguousarray(pred_disp_err_adv[None].transpose([0, 3, 1, 2])))
+            img_outputs_std = {
+                'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
+                'disp_pred_std': pred_disp[[0]].repeat([1, 3, 1, 1]),
+                'disp_err_std': pred_disp_err_std,
+                'disp_pred_adv': std_disp[[0]].repeat([1, 3, 1, 1]),
+                'disp_err_adv': pred_disp_err_adv,
+                'adv_L': adv_L[[0]], # [B,3,H,W] or [0,1] or [0,255]
+                'adv_LT': adv_LT[[0]],
+                'img_LT': img_L_transformed[[0]],
+                'img_L': img_L[[0]],
+            }
+            err_metrics_std = compute_err_metric(disp_gt,
+                                             depth_gt,
+                                             pred_disp,
+                                             img_focal_length,
+                                             img_baseline,
+                                             mask)
+            err_metrics_adv = compute_err_metric(disp_gt,
+                                             depth_gt,
+                                             adv_disp,
+                                             img_focal_length,
+                                             img_baseline,
+                                             mask)
+            scalar_outputs_std.update(err_metrics_std)
+            scalar_outputs_adv.update(err_metrics_adv)
+
+        if is_distributed:
+            scalar_outputs_std = reduce_scalar_outputs(scalar_outputs_std, cuda_device)
+            scalar_outputs_adv = reduce_scalar_outputs(scalar_outputs_adv, cuda_device)
+        return scalar_outputs_reproj, scalar_outputs_std, img_outputs_std, img_output_reproj, scalar_outputs_adv
 
 
 if __name__ == '__main__':
