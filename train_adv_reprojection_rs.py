@@ -126,8 +126,7 @@ def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimiz
         gc.collect()
 
         # One epoch validation loop
-        avg_val_scalars_std = AverageMeterDict()
-        avg_val_scalars_adv = AverageMeterDict()
+        avg_val_scalars_psmnet = AverageMeterDict()
         for batch_idx, sample in enumerate(ValImgLoader):
             global_step = (len(ValImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE
             do_summary = global_step % args.summary_freq == 0
@@ -278,12 +277,40 @@ def train_sample(sample, transformer_model, psmnet_model,
     # Get reprojection loss on real
     _, _, img_real_L_transformed, img_real_R_transformed \
         = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
+    real_pred_disp, pred_disp = 0,0
     if isTrain:
-        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
+        _, _, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
         real_pred_disp = pred_disp3
     else:
         with torch.no_grad():
             real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
+
+    if isTrain and adv_train:
+        input_L_warped = apply_disparity(img_real_R, -real_pred_disp) # to do in the future get input_R_warped
+        input_L_warped = input_L_warped.detach().clone()
+        adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed, disp_gt, input_L_warped, input_L_warped, mask, disp=False)
+        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
+        pred_disp = pred_disp3
+
+    elif not isTrain and adv_train:
+        input_L_warped = apply_disparity(img_real_R, -real_pred_disp) # to do in the future get input_R_warped
+        input_L_warped = input_L_warped.detach().clone()
+        adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed, disp_gt, input_L_warped, input_L_warped, mask, isTrain=False, disp=False)
+        pred_disp = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
+
+        with torch.no_grad():
+            std_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
+
+    else:
+        pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
+        input_L_warped = apply_disparity(img_real_R, -real_pred_disp) # to do in the future get input_R_warped
+        input_L_warped = input_L_warped.detach().clone()
+        adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed, disp_gt, input_L_warped, input_L_warped, mask, isTrain=False, disp=False)
+
+        with torch.no_grad():
+            adv_disp = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
+
+
     real_img_reproj_loss, real_img_warped, real_img_reproj_mask = get_reprojection_error(img_real_L, img_real_R, real_pred_disp)
 
     # Backward on real

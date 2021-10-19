@@ -1,3 +1,6 @@
+import sys
+sys.path.append("..")
+
 import os
 import numpy as np
 
@@ -6,6 +9,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.distributions import uniform
 from torch.autograd import Variable
+from utils.reprojection import get_reprojection_error, apply_disparity
 
 def project(x, original_x, epsilon, _type='linf'):
 
@@ -60,7 +64,8 @@ class FastGradientSignUntargeted():
         # The perturbation of epsilon
         self._type = _type
 
-    def perturb(self, imgL, imgR, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_R_warped, mask, reduction4loss='mean', isTrain=True):
+    def perturb(self, imgL, imgR, img_L_transformed, img_R_transformed, disp_gt, \
+        input_L_warped, input_R_warped, mask, isTrain=True, reprojection=True, disp=True):
         # original_images: values are within self.min_val and self.max_val
 
         change = torch.abs(input_R_warped - imgR)
@@ -94,22 +99,25 @@ class FastGradientSignUntargeted():
         with torch.enable_grad():
             for _iter in range(self.max_iters):
                 loss = 0
-                if isTrain:
-                    pred_disp1, pred_disp2, pred_disp3 = self.model(xL, xR, xLT, xRT)
-                    pred_disp = pred_disp3
-                    loss = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
-                           + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
-                           + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
+                pred_disp = 0
+                if disp:
+                    if isTrain:
+                        pred_disp1, pred_disp2, pred_disp3 = self.model(xL, xR, xLT, xRT)
+                        pred_disp = pred_disp3
+                        loss += 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
+                               + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
+                               + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
+                    else:
+                        pred_disp = self.model(xL, xR, xLT, xRT)
+                        loss += F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
                 else:
                     pred_disp = self.model(xL, xR, xLT, xRT)
-                    loss = F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
+                if reprojection:
+                    mask = mask.detach()
+                    img_reproj_loss, _, _ = get_reprojection_error(xL, xR, pred_disp, mask)
+                    loss += img_reproj_loss
 
-                if reduction4loss == 'none':
-                    grad_outputs = torch.ones(loss.shape).cuda()
-
-                else:
-                    grad_outputs = None
-
+                grad_outputs = None
 
                 xL = self.aug(xL, imgL, loss, grad_outputs)
                 xR = self.aug(xR, imgR, loss, grad_outputs)
