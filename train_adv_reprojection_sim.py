@@ -221,12 +221,13 @@ def train_sample(sample, transformer_model, psmnet_model,
         with torch.no_grad():
             sim_pred_disp = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
 
-    adv_L, adv_R, input_L_warped = 0, 0, 0
+    adv_L, adv_R, adv_LT, adv_RT, input_L_warped = 0, 0, 0, 0, 0
     loss_psmnet = 0
     if isTrain and adv_train:
         psmnet_model.zero_grad()
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
         input_L_warped = input_L_warped.detach().clone()
+        img_LT = img_L_transformed.detach().clone()
         adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask)
         pred_disp1, pred_disp2, pred_disp3 = psmnet_model(adv_L, adv_R, adv_LT, adv_RT)
         pred_disp = pred_disp3
@@ -237,6 +238,8 @@ def train_sample(sample, transformer_model, psmnet_model,
     elif isTrain and not adv_train:
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
         input_L_warped = input_L_warped.detach().clone()
+        img_LT = img_L_transformed.detach().clone()
+        pred_disp = sim_pred_disp
         loss_psmnet = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
                + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
                + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
@@ -244,6 +247,7 @@ def train_sample(sample, transformer_model, psmnet_model,
     elif not isTrain and adv_train:
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
         input_L_warped = input_L_warped.detach().clone()
+        img_LT = img_L_transformed.detach().clone()
         adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask, isTrain=False)
         std_disp = sim_pred_disp
         with torch.no_grad():
@@ -255,6 +259,7 @@ def train_sample(sample, transformer_model, psmnet_model,
     else:
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
         input_L_warped = input_L_warped.detach().clone()
+        img_LT = img_L_transformed.detach().clone()
         adv_L, adv_R, adv_LT, adv_RT  = attack.perturb(img_L, img_R, img_L_transformed, img_R_transformed, disp_gt, input_L_warped, input_L_warped, mask, isTrain=False)
         pred_disp = sim_pred_disp
         with torch.no_grad():
@@ -299,10 +304,10 @@ def train_sample(sample, transformer_model, psmnet_model,
 
     # Save reprojection outputs and images
     img_output_reproj = {
-        'sim_img_reprojection': {
+        'sim_reprojection': {
             'R': img_R, 'R_warped': sim_img_warped, 'mask': sim_img_reproj_mask
         },
-        'real_img_reprojection': {
+        'real_reprojection': {
             'R': img_real_R, 'R_warped': real_img_warped, 'mask': real_img_reproj_mask
         }
 
@@ -324,16 +329,26 @@ def train_sample(sample, transformer_model, psmnet_model,
         # Compute error images
         pred_disp_err_np = disp_error_img(pred_disp[[0]], disp_gt[[0]], mask[[0]])
         pred_disp_err_tensor = torch.from_numpy(np.ascontiguousarray(pred_disp_err_np[None].transpose([0, 3, 1, 2])))
-        img_outputs_psmnet = {
-            'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
-            'disp_pred': pred_disp[[0]].repeat([1, 3, 1, 1]),
-            'disp_err': pred_disp_err_tensor,
-            'adv_L': adv_L[[0]], # [B,3,H,W] or [0,1] or [0,255]
-            'adv_LT': adv_LT[[0]],
-            'img_LT': img_L_transformed[[0]],
-            'img_L': img_L[[0]],
-            'L_warped': input_L_warped[[0]],
-        }
+        if adv_train:
+            img_outputs_psmnet = {
+                'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
+                'disp_pred': pred_disp[[0]].repeat([1, 3, 1, 1]),
+                'disp_err': pred_disp_err_tensor,
+                'adv_L': adv_L[[0]], # [B,3,H,W] or [0,1] or [0,255]
+                'adv_LT': adv_LT[[0]],
+                'img_LT': img_LT[[0]],
+                'img_L': img_L[[0]],
+                'L_warped': input_L_warped[[0]],
+            }
+        else:
+            img_outputs_psmnet = {
+                'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
+                'disp_pred': pred_disp[[0]].repeat([1, 3, 1, 1]),
+                'disp_err': pred_disp_err_tensor,
+                'img_LT': img_LT[[0]],
+                'img_L': img_L[[0]],
+                'L_warped': input_L_warped[[0]],
+            }
 
         if is_distributed:
             scalar_outputs_psmnet = reduce_scalar_outputs(scalar_outputs_psmnet, cuda_device)
@@ -357,7 +372,7 @@ def train_sample(sample, transformer_model, psmnet_model,
                 'disp_err_std': pred_disp_err_std,
                 'adv_L': adv_L[[0]], # [B,3,H,W] or [0,1] or [0,255]
                 'adv_LT': adv_LT[[0]],
-                'img_LT': img_L_transformed[[0]],
+                'img_LT': img_LT[[0]],
                 'img_L': img_L[[0]],
             }
             err_metrics_std = compute_err_metric(disp_gt,
@@ -384,11 +399,11 @@ def train_sample(sample, transformer_model, psmnet_model,
                 'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
                 'disp_pred_std': pred_disp[[0]].repeat([1, 3, 1, 1]),
                 'disp_err_std': pred_disp_err_std,
-                'disp_pred_adv': std_disp[[0]].repeat([1, 3, 1, 1]),
+                'disp_pred_adv': adv_disp[[0]].repeat([1, 3, 1, 1]),
                 'disp_err_adv': pred_disp_err_adv,
                 'adv_L': adv_L[[0]], # [B,3,H,W] or [0,1] or [0,255]
                 'adv_LT': adv_LT[[0]],
-                'img_LT': img_L_transformed[[0]],
+                'img_LT': img_LT[[0]],
                 'img_L': img_L[[0]],
             }
             err_metrics_std = compute_err_metric(disp_gt,

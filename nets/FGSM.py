@@ -111,9 +111,16 @@ class FastGradientSignUntargeted():
                         pred_disp = self.model(xL, xR, xLT, xRT)
                         loss += F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
                 else:
-                    pred_disp = self.model(xL, xR, xLT, xRT)
+                    if isTrain:
+                        pred_disp1, pred_disp2, pred_disp3 = self.model(xL, xR, xLT, xRT)
+                        pred_disp = pred_disp3
+                    else:
+                        pred_disp = self.model(xL, xR, xLT, xRT)
                 if reprojection:
-                    mask = mask.detach()
+                    if disp:
+                        mask = mask.detach()
+                    else:
+                        mask = None
                     img_reproj_loss, _, _ = get_reprojection_error(xL, xR, pred_disp, mask)
                     loss += img_reproj_loss
 
