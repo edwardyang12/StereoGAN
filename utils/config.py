@@ -33,9 +33,12 @@ _C.SPLIT.REAL_REALSENSE = '1024_depth_real.png'
 
 # Configuration for testing on real dataset
 _C.REAL = CN()
-_C.REAL.DATASET = '/code/real_dataset_local_v9'  # path to your real testing dataset
-_C.REAL.LEFT = '1024_irL_real_1080.png'
-_C.REAL.RIGHT = '1024_irR_real_1080.png'
+_C.REAL.DATASET_V9 = '/code/real_dataset_local_v9'
+_C.REAL.DATASET = '/code/real_dataset_local_v10'  # path to your real testing dataset
+_C.REAL.LEFT = '1024_irL_real.png'
+_C.REAL.LEFT_NO_IR = '1024_irL_real_off.png'
+_C.REAL.RIGHT = '1024_irR_real.png'
+_C.REAL.RIGHT_NO_IR = '1024_irR_real_off.png'
 _C.REAL.PAD_WIDTH = 960
 _C.REAL.PAD_HEIGHT = 544
 

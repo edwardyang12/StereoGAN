@@ -19,9 +19,11 @@ SPLIT:
 
 # Configuration for testing on real dataset
 REAL:
-  DATASET: '/cephfs/datasets/iccv_pnp/real_data_v9/'  # path to your real testing dataset
-  LEFT: '1024_irL_real_1080.png'
-  RIGHT: '1024_irR_real_1080.png'
+  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/real_data_v10/'  # path to your real testing dataset
+  LEFT: '1024_irL_real.png'
+  LEFT_NO_IR: '1024_irL_real_off.png'
+  RIGHT: '1024_irR_real.png'
+  RIGHT_NO_IR: '1024_irR_real_off.png'
 
 # Solver args
 SOLVER:
@@ -32,7 +34,7 @@ SOLVER:
   LR_STEPS: '10000,20000,30000:2'    # the steps to decay lr: the downscale rate
   STEPS: 50000                              # number of steps to train
   EPOCHS: 4
-  BATCH_SIZE: 2                             # batch size
+  BATCH_SIZE: 1                             # batch size
   NUM_WORKER: 1                               # num_worker in dataloader
 
 # Model parameters

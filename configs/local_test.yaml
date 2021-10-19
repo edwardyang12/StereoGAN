@@ -16,8 +16,9 @@ SPLIT:
 
 # Real dataset
 REAL:
-  DATASET: '/code/real_dataset_local_v9'  # path to your real testing dataset
-  LEFT: '1024_irL_real_1080.png'
-  RIGHT: '1024_irR_real_1080.png'
+  DATASET_V9: '/code/real_dataset_local_v9'  # path to your real testing dataset
+  DATASET: '/code/real_dataset_local_v10'
+  LEFT: '1024_irL_real.png'
+  RIGHT: '1024_irR_real.png'
   PAD_WIDTH: 960
   PAD_HEIGHT: 544

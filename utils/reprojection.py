@@ -29,7 +29,34 @@ def apply_disparity(img, disp):
     return output
 
 
-def get_reprojection_error(input_L, input_R, pred_disp_l, mask=None):
+def get_reprojection_error(input_L, input_R, pred_disp_l, pred_disp_r, mask_l=None, mask_r=None):
+    """
+    input - [bs, c, h, w], feature or image
+    pred_disp - [bs, 1, h, w]
+    mask - [bs, 1, h, w]
+    Note: apply_disparity use pred_disp_l to warp right image to left image (since F.grid_sample behaves a bit different),
+    while appliy_disparity_cu use pred_disp_l to warp left to right
+    """
+    input_L_warped = apply_disparity(input_R, -pred_disp_l)
+    input_R_warped = apply_disparity(input_L, pred_disp_r)
+    if mask_l is None: # real does not have gt and thus mask
+        # mask = torch.ones_like(input_L_warped).type(torch.bool)
+        disp_gt_l = apply_disparity_cu(pred_disp_r, pred_disp_r.type(torch.int))  # [bs, 1, H, W]
+        disp_gt_r = apply_disparity_cu(pred_disp_l, -pred_disp_l.type(torch.int))  # [bs, 1, H, W]
+        mask_l = (disp_gt_l < 192) * (disp_gt_l > 0)  # Note in training we do not exclude bg
+        mask_l = mask_l.detach()
+        mask_r = (disp_gt_r < 192) * (disp_gt_r > 0)  # Note in training we do not exclude bg
+        mask_r = mask_r.detach()
+    bs, c, h, w = input_L.shape
+    mask_l = mask_l.repeat(1, c, 1, 1)
+    mask_r = mask_r.repeat(1, c, 1, 1)
+    reprojection_loss_l = F.mse_loss(input_L_warped[mask_l], input_L[mask_l])
+    reprojection_loss_r = F.mse_loss(input_R_warped[mask_r], input_R[mask_r])
+    return reprojection_loss_l, reprojection_loss_r, input_L_warped, input_R_warped, \
+           mask_l.type(torch.int), mask_r.type(torch.int)
+
+
+def get_reprojection_error_old(input_L, input_R, pred_disp_l, mask=None):
     """
     input - [bs, c, h, w], feature or image
     pred_disp - [bs, 1, h, w], this should come from left camera frame
@@ -45,7 +72,6 @@ def get_reprojection_error(input_L, input_R, pred_disp_l, mask=None):
         mask = torch.ones_like(input_L_warped).type(torch.bool)
     reprojection_loss = F.mse_loss(input_L_warped[mask], input_L[mask])
     return reprojection_loss, input_L_warped, mask.type(torch.int)
-
 
 if __name__ == '__main__':
     img_L = torch.rand(1, 3, 256, 512).cuda()

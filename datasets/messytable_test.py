@@ -97,7 +97,7 @@ class MessytableTestDataset(Dataset):
             img_depth_l = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHL) for p in prefix]
             img_depth_r = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHR) for p in prefix]
             img_meta = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.META) for p in prefix]
-            img_label = [os.path.join(cfg.REAL.DATASET, p, cfg.SPLIT.LABEL) for p in prefix]
+            img_label = [os.path.join(cfg.REAL.DATASET_V9, p, cfg.SPLIT.LABEL) for p in prefix]
             img_sim_realsense = [os.path.join(sim_dataset, p, sim_realsense) for p in prefix]
             img_real_realsense = [os.path.join(real_dataset, p, real_realsense) for p in prefix]
 
@@ -124,10 +124,10 @@ class MessytableTestDataset(Dataset):
             # Adjust brightness of real images
             img_L_rgb = Image.open(self.img_L_real[idx]).convert(mode='L')
             img_R_rgb = Image.open(self.img_R_real[idx]).convert(mode='L')
-            img_L_rgb = gamma_trans(np.array(img_L_rgb), 0.5)
-            img_R_rgb = gamma_trans(np.array(img_R_rgb), 0.5)
-            # img_L_rgb = np.array(img_L_rgb)
-            # img_R_rgb = np.array(img_R_rgb)
+            # img_L_rgb = gamma_trans(np.array(img_L_rgb), 0.5)
+            # img_R_rgb = gamma_trans(np.array(img_R_rgb), 0.5)
+            img_L_rgb = np.array(img_L_rgb)
+            img_R_rgb = np.array(img_R_rgb)
             img_L_rgb = img_L_rgb[:, :, None]
             img_R_rgb = img_R_rgb[:, :, None]
             img_L_rgb = np.repeat(img_L_rgb, 3, axis=-1)

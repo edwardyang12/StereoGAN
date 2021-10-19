@@ -1,6 +1,6 @@
 """
-Author: Isabella Liu 10/14/21
-Feature: Test PSMNet Reprojection
+Author: Isabella Liu 10/16/21
+Feature: Test PSMNet Cycle Reprojection
 """
 
 import os
@@ -10,8 +10,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import numpy as np
 
-from nets.cycle_gan import CycleGANModel
-from nets.psmnet import PSMNet
+from nets.psmnet_cycle import PSMNet
 from nets.transformer import Transformer
 from datasets.messytable_test import get_test_loader
 from utils.cascade_metrics import compute_err_metric, compute_obj_err
@@ -25,7 +24,7 @@ parser.add_argument('--config-file', type=str, default='./configs/local_test.yam
                     metavar='FILE', help='Config files')
 parser.add_argument('--model', type=str, default='', metavar='FILE', help='Path to test model')
 parser.add_argument('--gan-model', type=str, default='', metavar='FILE', help='Path to test gan model')
-parser.add_argument('--output', type=str, default='../testing_output_feature_cyclegan_psmnet_10_18', help='Path to output folder')
+parser.add_argument('--output', type=str, default='../testing_output_feature_cyclegan_psmnet_new', help='Path to output folder')
 parser.add_argument('--debug', action='store_true', default=False, help='Debug mode')
 parser.add_argument('--annotate', type=str, default='', help='Annotation to the experiment')
 parser.add_argument('--onreal', action='store_true', default=False, help='Test on real dataset')
@@ -42,8 +41,8 @@ cuda_device = torch.device("cuda:{}".format(args.local_rank))
 if args.gan_model == '':
     args.gan_model = args.model
 
-# python test_psmnet_reprojection.py --model /code/models/model_4.pth --onreal --exclude-bg --exclude-zeros
-# python test_psmnet_reprojection.py --config-file configs/remote_test.yaml --model ../train_8_14_cascade/train1/models/model_best.pth --onreal --exclude-bg --exclude-zeros --debug --gan-model
+# python test_psmnet_cycle_reprojection.py --model /code/models/model_4.pth --onreal --exclude-bg --exclude-zeros
+# python test_psmnet_cycle_reprojection.py --config-file configs/remote_test.yaml --model ../train_8_14_cascade/train1/models/model_best.pth --onreal --exclude-bg --exclude-zeros --debug --gan-model
 
 
 def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
@@ -135,7 +134,8 @@ def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
         ground_mask = torch.logical_not(mask).squeeze(0).squeeze(0).detach().cpu().numpy()
 
         with torch.no_grad():
-            pred_disp = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
+            pred_disp_l, pred_disp_r = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
+        pred_disp = pred_disp_l  # use pred_disp in left frame during testing
         pred_disp = pred_disp[:, :, top_pad:, :]  # TODO: if right_pad > 0 it needs to be (:-right_pad)
         pred_depth = img_focal_length * img_baseline / pred_disp  # pred depth in m
 
