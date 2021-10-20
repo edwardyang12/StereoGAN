@@ -153,7 +153,9 @@ def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimiz
                 cur_err = new_err
                 checkpoint_data = {
                     'epoch': epoch_idx,
+                    'Transformer': transformer_model.state_dict(),
                     'PSMNet': psmnet_model.state_dict(),
+                    'optimizerTransformer': transformer_optimizer.state_dict(),
                     'optimizerPSMNet': psmnet_optimizer.state_dict()
                 }
                 save_filename = os.path.join(args.logdir, 'models', f'model_best.pth')
@@ -266,7 +268,7 @@ def train_sample(sample, transformer_model, psmnet_model,
         }
     }
     scalar_outputs_reproj = {'sim_reproj_loss': sim_img_reproj_loss.item(),
-                             'real_reproj_loss:': real_img_reproj_loss.item()}
+                             'real_reproj_loss': real_img_reproj_loss.item()}
 
 
     # Compute stereo error metrics on sim

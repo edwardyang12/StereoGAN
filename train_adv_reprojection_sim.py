@@ -160,7 +160,9 @@ def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimiz
                 cur_err = new_err
                 checkpoint_data = {
                     'epoch': epoch_idx,
+                    'Transformer': transformer_model.state_dict(),
                     'PSMNet': psmnet_model.state_dict(),
+                    'optimizerTransformer': transformer_optimizer.state_dict(),
                     'optimizerPSMNet': psmnet_optimizer.state_dict()
                 }
                 save_filename = os.path.join(args.logdir, 'models', f'model_best.pth')
@@ -223,6 +225,7 @@ def train_sample(sample, transformer_model, psmnet_model,
 
     adv_L, adv_R, adv_LT, adv_RT, input_L_warped = 0, 0, 0, 0, 0
     loss_psmnet = 0
+    sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = 0,0,0
     if isTrain and adv_train:
         psmnet_model.zero_grad()
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
@@ -234,6 +237,7 @@ def train_sample(sample, transformer_model, psmnet_model,
         loss_psmnet = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
                + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
                + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
+        sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(adv_L, adv_R, pred_disp, mask)
 
     elif isTrain and not adv_train:
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
@@ -243,6 +247,7 @@ def train_sample(sample, transformer_model, psmnet_model,
         loss_psmnet = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
                + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
                + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
+        sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, pred_disp, mask)
 
     elif not isTrain and adv_train:
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
@@ -255,6 +260,7 @@ def train_sample(sample, transformer_model, psmnet_model,
 
         std_loss = F.smooth_l1_loss(std_disp[mask], disp_gt[mask], reduction='mean')
         adv_loss = F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
+        sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(adv_L, adv_R, pred_disp, mask)
 
     else:
         input_L_warped = apply_disparity(img_R, -sim_pred_disp) # to do in the future get input_R_warped
@@ -267,9 +273,7 @@ def train_sample(sample, transformer_model, psmnet_model,
 
         adv_loss = F.smooth_l1_loss(adv_disp[mask], disp_gt[mask], reduction='mean')
         std_loss = F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
-
-    # Get reprojection loss on sim
-    sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, pred_disp, mask)
+        sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, pred_disp, mask)
 
     # Backward on sim
     sim_loss = loss_psmnet + sim_img_reproj_loss
