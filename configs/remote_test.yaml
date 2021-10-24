@@ -7,6 +7,7 @@ DIR:
 # Split files
 SPLIT:
   VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/real_v9/training_lists/all.txt'  # training lists of your sim dataset
+#  VAL: '/isabella-fast/FeatureGAN/lists/newTest.txt'  # training lists of your sim dataset
   LEFT: '0128_irL_kuafuv2_half.png'
   RIGHT: '0128_irR_kuafuv2_half.png'
   DEPTHL: 'depthL.png'
@@ -22,3 +23,5 @@ REAL:
   RIGHT: '1024_irR_real.png'
   PAD_WIDTH: 960
   PAD_HEIGHT: 544
+  MASK_FILE: '/isabella-fast/FeatureGAN/real_masks/all.txt'
+  MASK: '/isabella-fast/FeatureGAN/real_masks'

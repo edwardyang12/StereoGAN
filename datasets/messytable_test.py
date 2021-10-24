@@ -65,7 +65,7 @@ class MessytableTestDataset(Dataset):
         :param sub: If debug mode is enabled, sub will be the number of data loaded
         """
         self.img_L, self.img_R, self.img_L_real, self.img_R_real, self.img_depth_l, self.img_depth_r, \
-        self.img_meta, self.img_label, self.img_sim_realsense, self.img_real_realsense \
+        self.img_meta, self.img_label, self.img_sim_realsense, self.img_real_realsense, self.mask_scenes \
             = self.__get_split_files__(split_file, debug=debug, sub=sub)
         self.onReal = onReal
         self.brightness_factor = 1.8
@@ -113,8 +113,12 @@ class MessytableTestDataset(Dataset):
                 img_sim_realsense = img_sim_realsense[:sub]
                 img_real_realsense = img_real_realsense[:sub]
 
+        # Obtain robot arm mask list
+        with open(cfg.REAL.MASK_FILE, 'r') as f:
+            mask_scenes = [line.strip() for line in f]
+
         return img_L_sim, img_R_sim, img_L_real, img_R_real, img_depth_l, img_depth_r, img_meta, img_label, \
-            img_sim_realsense, img_real_realsense
+            img_sim_realsense, img_real_realsense, mask_scenes
 
     def __len__(self):
         return len(self.img_L)
@@ -171,6 +175,18 @@ class MessytableTestDataset(Dataset):
         img_disp_r = np.zeros_like(img_depth_r)
         img_disp_r[mask] = focal_length * baseline / img_depth_r[mask]
 
+        # Mask out the robot arm, mask images are stored in 1280 * 720
+        prefix = self.img_L[idx].split('/')[-2]
+        scene_id = prefix.split('-')[-1]
+        if scene_id in self.mask_scenes:
+            robot_mask_file = os.path.join(cfg.REAL.MASK, scene_id + '.png')
+            robot_mask = Image.open(robot_mask_file).convert(mode='L')
+            h, w = mask.shape
+            robot_mask = robot_mask.resize((w,h), resample=Image.BILINEAR)
+            robot_mask = np.array(robot_mask) / 255
+        else:
+            robot_mask = np.zeros_like(img_depth_l)
+
         # Convert img_depth_realsense to irL camera frame
         img_depth_realsense = calc_left_ir_depth_from_rgb(intrinsic, intrinsic_l,
                                                           extrinsic, extrinsic_l, img_depth_realsense)
@@ -188,9 +204,10 @@ class MessytableTestDataset(Dataset):
         item['img_depth_r'] = torch.tensor(img_depth_r, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W]
         item['img_depth_realsense'] = torch.tensor(img_depth_realsense, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W]
         item['img_label'] = torch.tensor(img_label, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W]
-        item['prefix'] = self.img_L[idx].split('/')[-2]
+        item['prefix'] = prefix
         item['focal_length'] = torch.tensor(focal_length, dtype=torch.float32).unsqueeze(0).unsqueeze(0).unsqueeze(0)
         item['baseline'] = torch.tensor(baseline, dtype=torch.float32).unsqueeze(0).unsqueeze(0).unsqueeze(0)
+        item['robot_mask'] = torch.tensor(robot_mask, dtype=torch.float32).unsqueeze(0)
 
         if self.onReal is False:
             item['img_L_real'] = normalization(img_L_rgb_real).type(torch.FloatTensor)
@@ -225,3 +242,4 @@ if __name__ == '__main__':
     print(item['img_disp_l'].shape)
     print(item['prefix'])
     print(item['img_depth_realsense'].shape)
+    print(item['robot_mask'].shape)

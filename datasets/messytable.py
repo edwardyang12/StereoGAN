@@ -14,8 +14,6 @@ import cv2
 
 from utils.config import cfg
 from utils.util import load_pickle
-# from ..utils.config import cfg
-# from ..utils.util import load_pickle
 
 
 def __gamma_trans__(img, gamma):
@@ -28,6 +26,31 @@ def __get_ir_pattern__(img_ir: np.array, img: np.array, threshold=0.01):
     diff = np.abs(img_ir - img)
     ir = np.zeros_like(diff)
     ir[diff > threshold] = 1
+    return ir
+
+
+def __get_smoothed_ir_pattern__(img_ir: np.array, img: np.array, ks=9):
+    h, w = img_ir.shape
+    hs = int(h//ks)
+    ws = int(w//ks)
+    diff = np.abs(img_ir - img)
+    diff_avg = cv2.resize(diff, (ws,hs), interpolation = cv2.INTER_AREA)
+    diff_avg = cv2.resize(diff_avg, (w,h), interpolation = cv2.INTER_AREA)
+    ir = np.zeros_like(diff)
+    ir[diff > diff_avg] = 1
+    return ir
+
+
+def __get_smoothed_ir_pattern2__(img_ir: np.array, img: np.array, ks=9, threshold=0.005):
+    h, w = img_ir.shape
+    hs = int(h//ks)
+    ws = int(w//ks)
+    diff = np.abs(img_ir - img)
+    diff_avg = cv2.resize(diff, (ws,hs), interpolation = cv2.INTER_AREA)
+    diff_avg = cv2.resize(diff_avg, (w,h), interpolation = cv2.INTER_AREA)
+    ir = np.zeros_like(diff)
+    diff2 = diff - diff_avg
+    ir[diff2 > threshold] = 1
     return ir
 
 
@@ -77,14 +100,14 @@ def __get_split_files__(split_file, debug=False, sub=100):
         prefix = [line.strip() for line in f]
         np.random.shuffle(prefix)
 
-        img_L = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.LEFT) for p in prefix]
-        img_R = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.RIGHT) for p in prefix]
-        img_L_no_ir = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.LEFT_NO_IR) for p in prefix]
-        img_R_no_ir = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.RIGHT_NO_IR) for p in prefix]
-        img_depth_l = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHL) for p in prefix]
-        img_depth_r = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHR) for p in prefix]
-        img_meta = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.META) for p in prefix]
-        img_label = [os.path.join(cfg.REAL.DATASET, p, cfg.SPLIT.LABEL) for p in prefix]
+    img_L = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.LEFT) for p in prefix]
+    img_R = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.RIGHT) for p in prefix]
+    img_L_no_ir = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.LEFT_NO_IR) for p in prefix]
+    img_R_no_ir = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.RIGHT_NO_IR) for p in prefix]
+    img_depth_l = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHL) for p in prefix]
+    img_depth_r = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHR) for p in prefix]
+    img_meta = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.META) for p in prefix]
+    img_label = [os.path.join(cfg.REAL.DATASET, p, cfg.SPLIT.LABEL) for p in prefix]
 
     if debug is True:
         img_L = img_L[:sub]
@@ -96,14 +119,14 @@ def __get_split_files__(split_file, debug=False, sub=100):
         img_meta = img_meta[:sub]
         img_label = img_label[:sub]
 
-    img_real_list = os.listdir(cfg.REAL.DATASET)
-    img_real_list = [folder_name for folder_name in img_real_list if folder_name[0] in ['0', '1']]  # TODO
-    img_real_L = [os.path.join(cfg.REAL.DATASET, folder_name, cfg.REAL.LEFT) for folder_name in img_real_list]
-    img_real_R = [os.path.join(cfg.REAL.DATASET, folder_name, cfg.REAL.RIGHT) for folder_name in img_real_list]
-    img_real_L_no_ir = [os.path.join(cfg.REAL.DATASET, folder_name, cfg.REAL.LEFT_NO_IR) for folder_name in
-                        img_real_list]
-    img_real_R_no_ir = [os.path.join(cfg.REAL.DATASET, folder_name, cfg.REAL.RIGHT_NO_IR) for folder_name in
-                        img_real_list]
+    with open(cfg.REAL.FILE, 'r') as f:
+        prefix = [line.strip() for line in f]
+        np.random.shuffle(prefix)
+
+    img_real_L = [os.path.join(cfg.REAL.DATASET, p, cfg.REAL.LEFT) for p in prefix]
+    img_real_R = [os.path.join(cfg.REAL.DATASET, p, cfg.REAL.RIGHT) for p in prefix]
+    img_real_L_no_ir = [os.path.join(cfg.REAL.DATASET, p, cfg.REAL.LEFT_NO_IR) for p in prefix]
+    img_real_R_no_ir = [os.path.join(cfg.REAL.DATASET, p, cfg.REAL.RIGHT_NO_IR) for p in prefix]
 
     return img_L, img_R, img_L_no_ir, img_R_no_ir, img_depth_l, img_depth_r, img_meta, img_label, \
            img_real_L, img_real_R, img_real_L_no_ir, img_real_R_no_ir
@@ -133,8 +156,10 @@ class MessytableDataset(Dataset):
         img_R = np.array(Image.open(self.img_R[idx]).convert(mode='L')) / 255
         img_L_no_ir = np.array(Image.open(self.img_L_no_ir[idx]).convert(mode='L')) / 255
         img_R_no_ir = np.array(Image.open(self.img_R_no_ir[idx]).convert(mode='L')) / 255
-        img_L_ir_pattern = __get_ir_pattern__(img_L, img_L_no_ir)  # [H, W]
-        img_R_ir_pattern = __get_ir_pattern__(img_R, img_R_no_ir)
+        # img_L_ir_pattern = __get_ir_pattern__(img_L, img_L_no_ir)  # [H, W]
+        # img_R_ir_pattern = __get_ir_pattern__(img_R, img_R_no_ir)
+        img_L_ir_pattern = __get_smoothed_ir_pattern2__(img_L, img_L_no_ir)  # [H, W]
+        img_R_ir_pattern = __get_smoothed_ir_pattern2__(img_R, img_R_no_ir)
         img_L_rgb = np.repeat(img_L[:, :, None], 3, axis=-1)
         img_R_rgb = np.repeat(img_R[:, :, None], 3, axis=-1)
 
@@ -162,8 +187,10 @@ class MessytableDataset(Dataset):
         img_real_R_no_ir = np.array(img_real_R_no_ir) / 255
         # img_real_L = __gamma_trans__(np.array(img_real_L), 0.5)
         # img_real_R = __gamma_trans__(np.array(img_real_R), 0.5)
-        img_real_L_ir_pattern = __get_ir_pattern__(img_real_L, img_real_L_no_ir, threshold=0.02)  # [H, W]
-        img_real_R_ir_pattern = __get_ir_pattern__(img_real_R, img_real_R_no_ir, threshold=0.02)  # [H, W]
+        # img_real_L_ir_pattern = __get_ir_pattern__(img_real_L, img_real_L_no_ir, threshold=0.02)  # [H, W]
+        # img_real_R_ir_pattern = __get_ir_pattern__(img_real_R, img_real_R_no_ir, threshold=0.02)  # [H, W]
+        img_real_L_ir_pattern = __get_smoothed_ir_pattern2__(img_real_L, img_real_L_no_ir)  # [H, W]
+        img_real_R_ir_pattern = __get_smoothed_ir_pattern2__(img_real_R, img_real_R_no_ir)  # [H, W]
         img_real_L = np.repeat(img_real_L[:, :, None], 3, axis=-1)
         img_real_R = np.repeat(img_real_R[:, :, None], 3, axis=-1)
 

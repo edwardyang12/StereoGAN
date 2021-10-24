@@ -67,7 +67,7 @@ logger.info(f'Running with configs:\n{cfg}')
 logger.info(f'Running with {num_gpus} GPUs')
 
 # python -m torch.distributed.launch train_psmnet_ir_reprojection.py --summary-freq 1 --save-freq 1 --logdir ../train_10_14_psmnet_ir_reprojection/debug --debug
-# python -m torch.distributed.launch train_psmnet_ir_reprojection.py --config-file configs/remote_train_steps.yaml --summary-freq 10 --save-freq 100 --logdir ../train_10_14_psmnet_ir_reprojection/debug --debug
+# python -m torch.distributed.launch train_psmnet_ir_reprojection.py --config-file configs/remote_train_steps.yaml --summary-freq 10 --save-freq 100 --logdir ../train_10_21_psmnet_smooth_ir_reproj/debug --debug
 
 
 def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimizer,

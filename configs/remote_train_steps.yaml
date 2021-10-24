@@ -19,6 +19,8 @@ SPLIT:
 
 # Configuration for testing on real dataset
 REAL:
+#  FILE: '/isabella-fast/FeatureGAN/lists/newTrain.txt'
+  FILE: '/cephfs/datasets/iccv_pnp/messy-table-dataset/real_v9/training_lists/all.txt'
   DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/real_data_v10/'  # path to your real testing dataset
   LEFT: '1024_irL_real.png'
   LEFT_NO_IR: '1024_irL_real_off.png'

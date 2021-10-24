@@ -25,7 +25,7 @@ parser.add_argument('--config-file', type=str, default='./configs/local_test.yam
                     metavar='FILE', help='Config files')
 parser.add_argument('--model', type=str, default='', metavar='FILE', help='Path to test model')
 parser.add_argument('--gan-model', type=str, default='', metavar='FILE', help='Path to test gan model')
-parser.add_argument('--output', type=str, default='../testing_output_feature_cyclegan_psmnet_10_18', help='Path to output folder')
+parser.add_argument('--output', type=str, default='../testing_output_feature_cyclegan_psmnet_10_24_with_mask', help='Path to output folder')
 parser.add_argument('--debug', action='store_true', default=False, help='Debug mode')
 parser.add_argument('--annotate', type=str, default='', help='Annotation to the experiment')
 parser.add_argument('--onreal', action='store_true', default=False, help='Test on real dataset')
@@ -74,6 +74,7 @@ def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
         img_focal_length = data['focal_length'].cuda()
         img_baseline = data['baseline'].cuda()
         prefix = data['prefix'][0]
+        robot_mask = data['robot_mask'].cuda()
 
         img_disp_l = F.interpolate(img_disp_l, (540, 960), mode='nearest',
                              recompute_scale_factor=False)
@@ -82,6 +83,8 @@ def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
         img_depth_realsense = F.interpolate(img_depth_realsense, (540, 960), mode='nearest',
                              recompute_scale_factor=False)
         img_label = F.interpolate(img_label, (540, 960), mode='nearest',
+                             recompute_scale_factor=False).type(torch.int)
+        img_robot_mask = F.interpolate(robot_mask, (540, 960), mode='nearest',
                              recompute_scale_factor=False).type(torch.int)
 
         # If using warp_op, computing img_disp_l from img_disp_r
@@ -119,12 +122,13 @@ def test(transformer_model, psmnet_model, val_loader, logger, log_dir):
         img_L_transformed = F.pad(img_L_transformed, (0, right_pad, top_pad, 0, 0, 0, 0, 0), mode='constant', value=0)
         img_R_transformed = F.pad(img_R_transformed, (0, right_pad, top_pad, 0, 0, 0, 0, 0), mode='constant', value=0)
 
+        robot_mask = img_robot_mask == 0
         if args.exclude_bg:
             # Mask ground pixel to False
             img_ground_mask = (img_depth_l > 0) & (img_depth_l < 1.25)
-            mask = (img_disp_l < cfg.ARGS.MAX_DISP) * (img_disp_l > 0) * img_ground_mask
+            mask = (img_disp_l < cfg.ARGS.MAX_DISP) * (img_disp_l > 0) * img_ground_mask * robot_mask
         else:
-            mask = (img_disp_l < cfg.ARGS.MAX_DISP) * (img_disp_l > 0)
+            mask = (img_disp_l < cfg.ARGS.MAX_DISP) * (img_disp_l > 0) * img_robot_mask * robot_mask
 
         # Exclude uncertain pixel from realsense_depth_pred
         realsense_zeros_mask = img_depth_realsense > 0
