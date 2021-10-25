@@ -64,20 +64,21 @@ class FastGradientSignUntargeted():
         # The perturbation of epsilon
         self._type = _type
 
+    # perturbation that starts at diff
     def perturb(self, imgL, imgR, img_L_transformed, img_R_transformed, disp_gt, \
         input_L_warped, input_R_warped, mask, isTrain=True, reprojection=True, disp=True):
-        # original_images: values are within self.min_val and self.max_val
 
-        change = torch.abs(input_R_warped - imgR)
-        change.clamp_(0.01, 2)
-        # The adversaries created from random close points to the original data
-        distribution = uniform.Uniform(-change, change)
-        rand_perturbR = distribution.sample()
+        # to do until we implement R_warped
+        # change = torch.abs(input_R_warped - imgR)
+        # change.clamp_(0.01, 2)
+        # distribution = uniform.Uniform(-change, change)
+        # rand_perturbR = distribution.sample()
+        rand_perturbR = torch.FloatTensor(imgL.shape).uniform_(
+                -self.epsilon, self.epsilon)
         rand_perturbR = rand_perturbR.cuda()
 
         change = torch.abs(input_L_warped - imgL)
         change.clamp_(0.01, 2)
-        # The adversaries created from random close points to the original data
         distribution = uniform.Uniform(-change, change)
         rand_perturbL = distribution.sample()
         rand_perturbL = rand_perturbL.cuda()

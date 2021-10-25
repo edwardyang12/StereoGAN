@@ -28,8 +28,8 @@ SOLVER:
   LR_CASCADE: 0.001                         # base learning rate for cascade
   LR_G: 0.0002                              # base learning rate for G
   LR_D: 0.0002                              # base learning rate for D
-  LR_STEPS: '50000,75000,90000:2'    # the steps to decay lr: the downscale rate
-  STEPS: 100000                              # number of steps to train
+  LR_STEPS: '35000,40000,45000:2'    # the steps to decay lr: the downscale rate
+  STEPS: 50000                              # number of steps to train
   EPOCHS: 10
   BATCH_SIZE: 1                             # batch size
   NUM_WORKER: 1                               # num_worker in dataloader

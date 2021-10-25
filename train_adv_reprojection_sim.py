@@ -23,7 +23,7 @@ from utils.reduce import set_random_seed, synchronize, AverageMeterDict, \
     tensor2float, tensor2numpy, reduce_scalar_outputs, make_nograd_func
 from utils.util import setup_logger, weights_init, \
     adjust_learning_rate, save_scalars, save_scalars_graph, save_images, save_images_grid, disp_error_img
-from nets.FGSM import FastGradientSignUntargeted
+from nets.FGSM_start import FastGradientSignUntargeted
 
 cudnn.benchmark = True
 
