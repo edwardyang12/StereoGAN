@@ -8,8 +8,8 @@ DIR:
 SPLIT:
   TRAIN: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_train.txt'  # training lists of your training set
   VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_val.txt'  # training lists of your validation set
-  LEFT: '0128_rgbL_kuafuv2.png'
-  RIGHT: '0128_rgbR_kuafuv2.png'
+  LEFT: '0128_irL_denoised_half.png'
+  RIGHT: '0128_irR_denoised_half.png'
   DEPTHL: 'depthL.png'
   DEPTHR: 'depthR.png'
   META: 'meta.pkl'
