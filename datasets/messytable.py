@@ -100,12 +100,12 @@ class MessytableDataset(Dataset):
                                        contrast=[contrast, contrast])
             ]
         # Normalization
-        transform_list += [
-            Transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225],
-            )
-        ]
+        # transform_list += [
+        #    Transforms.Normalize(
+        #        mean=[0.485, 0.456, 0.406],
+        #        std=[0.229, 0.224, 0.225],
+        #    )
+        # ]
         custom_augmentation = Transforms.Compose(transform_list)
         return custom_augmentation
 
@@ -149,9 +149,12 @@ class MessytableDataset(Dataset):
         img_depth_r = img_depth_r[2*x: 2*(x+th), 2*y: 2*(y+tw)]
         img_real_rgb = img_real_rgb[2*x: 2*(x+th), 2*y: 2*(y+tw)]  # real original res in 1080*1920
 
+        transforms = self.__data_augmentation__(True, True)
         item = {}
-        item['img_L'] = torch.tensor(img_L_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
-        item['img_R'] = torch.tensor(img_R_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
+        item['img_L'] = transforms(img_L_rgb).to(torch.float32)
+        item['img_R'] = transforms(img_R_rgb).to(torch.float32)
+        # item['img_L'] = torch.tensor(img_L_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
+        # item['img_R'] = torch.tensor(img_R_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 1, H, W]
         item['img_real'] = torch.tensor(img_real_rgb, dtype=torch.float32).permute(2, 0, 1)  # [bs, 3, 2*H, 2*W]
         item['img_disp_l'] = torch.tensor(img_disp_l, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W] in dataloader
         item['img_depth_l'] = torch.tensor(img_depth_l, dtype=torch.float32).unsqueeze(0)  # [bs, 1, H, W]
