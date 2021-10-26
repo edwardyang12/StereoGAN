@@ -120,7 +120,7 @@ class MessytableDataset(Dataset):
         img_meta = load_pickle(self.img_meta[idx])
 
         # For unpaired pix2pix, load a random real image from real dataset [H, W, 1], in value range (-1, 1)
-        img_real_rgb = (np.array(Image.open(random.choice(self.img_real)))[:, :, None] - 127.5) / 127.5
+        img_real_rgb = (np.array(Image.open(random.choice(self.img_real)).convert('RGB')) - 127.5) / 127.5
 
         # Convert depth map to disparity map
         extrinsic_l = img_meta['extrinsic_l']
@@ -149,7 +149,7 @@ class MessytableDataset(Dataset):
         img_depth_r = img_depth_r[2*x: 2*(x+th), 2*y: 2*(y+tw)]
         img_real_rgb = img_real_rgb[2*x: 2*(x+th), 2*y: 2*(y+tw)]  # real original res in 1080*1920
 
-        transforms = self.__data_augmentation__(True, True)
+        transforms = self.__data_augmentation__(False, False)
         item = {}
         item['img_L'] = transforms(img_L_rgb).to(torch.float32)
         item['img_R'] = transforms(img_R_rgb).to(torch.float32)
