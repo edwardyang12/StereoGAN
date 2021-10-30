@@ -100,12 +100,12 @@ class MessytableDataset(Dataset):
                                        contrast=[contrast, contrast])
             ]
         # Normalization
-        # transform_list += [
-        #    Transforms.Normalize(
-        #        mean=[0.485, 0.456, 0.406],
-        #        std=[0.229, 0.224, 0.225],
-        #    )
-        # ]
+        transform_list += [
+            Transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            )
+        ]
         custom_augmentation = Transforms.Compose(transform_list)
         return custom_augmentation
 
@@ -113,8 +113,8 @@ class MessytableDataset(Dataset):
         return len(self.img_L)
 
     def __getitem__(self, idx):
-        img_L_rgb = (np.array(Image.open(self.img_L[idx]).convert('RGB').resize((960,540), resample=Image.BILINEAR)) - 127.5) / 127.5   # [H, W, 1], in (-1, 1)
-        img_R_rgb = (np.array(Image.open(self.img_R[idx]).convert('RGB').resize((960,540), resample=Image.BILINEAR)) - 127.5) / 127.5   # [H, W, 1], in (-1 , 1)
+        img_L_rgb = np.array(Image.open(self.img_L[idx]).convert('RGB').resize((960,540), resample=Image.BILINEAR))   # [H, W, 1], in (-1, 1)
+        img_R_rgb = np.array(Image.open(self.img_R[idx]).convert('RGB').resize((960,540), resample=Image.BILINEAR))   # [H, W, 1], in (-1 , 1)
         img_depth_l = np.array(Image.open(self.img_depth_l[idx])) / 1000    # convert from mm to m
         img_depth_r = np.array(Image.open(self.img_depth_r[idx])) / 1000    # convert from mm to m
         img_meta = load_pickle(self.img_meta[idx])
@@ -149,7 +149,7 @@ class MessytableDataset(Dataset):
         img_depth_r = img_depth_r[2*x: 2*(x+th), 2*y: 2*(y+tw)]
         img_real_rgb = img_real_rgb[2*x: 2*(x+th), 2*y: 2*(y+tw)]  # real original res in 1080*1920
 
-        transforms = self.__data_augmentation__(False, False)
+        transforms = self.__data_augmentation__(True, True)
         item = {}
         item['img_L'] = transforms(img_L_rgb).to(torch.float32)
         item['img_R'] = transforms(img_R_rgb).to(torch.float32)
