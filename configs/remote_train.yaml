@@ -3,7 +3,7 @@
 # Directories
 DIR:
   DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/real_data_v10/'  #  directory of your training dataset
-  SIMSET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training'
+  SIMSET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/real_v9/training/'
 
 # Split files
 SPLIT:
