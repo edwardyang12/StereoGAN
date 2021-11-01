@@ -11,6 +11,7 @@ cfg = _C
 # Directories
 _C.DIR = CN()
 _C.DIR.DATASET = '/code/dataset_local_v9/training'  #  directory of your training dataset
+_C.DIR.SIMSET = '/code/dataset_local_v9/training'
 
 # Split files
 _C.SPLIT = CN()
