@@ -9,8 +9,8 @@ DIR:
 SPLIT:
   TRAIN: '/edward-slow-vol/lists/newTrain.txt'  # training lists of your training set
   VAL: '/edward-slow-vol/lists/newTest.txt'  # training lists of your validation set
-  LEFT: '1024_irL_real_off.png'
-  RIGHT: '1024_irR_real_off.png'
+  LEFT: '1024_irL_real.png'
+  RIGHT: '1024_irR_real.png'
   DEPTHL: 'depthL.png'
   DEPTHR: 'depthR.png'
   META: 'meta.pkl'
