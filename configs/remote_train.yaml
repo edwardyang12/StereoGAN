@@ -2,14 +2,14 @@
 
 # Directories
 DIR:
-  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training'  #  directory of your training dataset
+  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/real_data_v10/'  #  directory of your training dataset
 
 # Split files
 SPLIT:
-  TRAIN: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_train.txt'  # training lists of your training set
-  VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_val.txt'  # training lists of your validation set
-  LEFT: '0128_irL_denoised_half.png'
-  RIGHT: '0128_irR_denoised_half.png'
+  TRAIN: '/edward-slow-vol/lists/newTrain.txt'  # training lists of your training set
+  VAL: '/edward-slow-vol/lists/newTest.txt'  # training lists of your validation set
+  LEFT: '1024_irL_real.png'
+  RIGHT: '1024_irR_real.png'
   DEPTHL: 'depthL.png'
   DEPTHR: 'depthR.png'
   META: 'meta.pkl'
@@ -23,13 +23,14 @@ REAL:
 
 # Solver args
 SOLVER:
-  LR_CASCADE: 0.001         # base learning rate for cascade
-  LR_G: 0.0002              # base learning rate for G
-  LR_D: 0.0002              # base learning rate for D
-  LR_EPOCHS: '2,4,6,8:2'    # the epochs to decay lr: the downscale rate
-  EPOCHS: 10                # number of epochs to train
-  BATCH_SIZE: 1            # batch size
-  NUM_WORKER: 1             # num_worker in dataloader
+  LR_CASCADE: 0.001                         # base learning rate for cascade
+  LR_G: 0.0002                              # base learning rate for G
+  LR_D: 0.0002                              # base learning rate for D
+  LR_STEPS: '40000,80000,120000:2'    # the steps to decay lr: the downscale rate
+  STEPS: 160000                              # number of steps to train
+  EPOCHS: 4
+  BATCH_SIZE: 3                             # batch size
+  NUM_WORKER: 1                               # num_worker in dataloader
 
 # Model parameters
 ARGS:
@@ -43,7 +44,7 @@ ARGS:
   USING_NS: True            # using neighbor search
   NS_SIZE: 3                # nb_size
   CROP_HEIGHT: 256          # crop height
-  CROP_WIDTH: 512           # crop width
+  CROP_WIDTH: 512          # crop width
 
 # Data augmentation
 DATA_AUG:
