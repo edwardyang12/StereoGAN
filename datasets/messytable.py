@@ -50,9 +50,9 @@ class MessytableDataset(Dataset):
 
             img_L = [os.path.join(dataset, p, img_left_name) for p in prefix]
             img_R = [os.path.join(dataset, p, img_right_name) for p in prefix]
-            img_depth_l = [os.path.join(cfg.DIR.SIMSET, p, cfg.SPLIT.DEPTHL) for p in prefix]
-            img_depth_r = [os.path.join(cfg.DIR.SIMSET, p, cfg.SPLIT.DEPTHR) for p in prefix]
-            img_meta = [os.path.join(cfg.DIR.SIMSET, p, cfg.SPLIT.META) for p in prefix]
+            img_depth_l = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHL) for p in prefix]
+            img_depth_r = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.DEPTHR) for p in prefix]
+            img_meta = [os.path.join(cfg.DIR.DATASET, p, cfg.SPLIT.META) for p in prefix]
             img_label = [os.path.join(cfg.REAL.DATASET, p, cfg.SPLIT.LABEL) for p in prefix]
 
             if debug is True:
