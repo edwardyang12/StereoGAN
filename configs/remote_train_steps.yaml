@@ -33,9 +33,9 @@ SOLVER:
   LR_G: 0.0002                              # base learning rate for G
   LR_D: 0.0002                              # base learning rate for D
   LR_GAN_STEPS: '10000, 20000, 30000:10'
-  LR_STEPS: '50000,75000,90000:2'    # the steps to decay lr: the downscale rate
-  STEPS: 100000                              # number of steps to train
-  EPOCHS: 10
+  LR_STEPS: '10000,20000,30000:2'    # the steps to decay lr: the downscale rate
+  STEPS: 50000                              # number of steps to train
+  EPOCHS: 4
   BATCH_SIZE: 1                             # batch size
   NUM_WORKER: 1                               # num_worker in dataloader
 
