@@ -2,15 +2,15 @@
 
 # Directories
 DIR:
-  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training'  #  directory of your training dataset
+  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v11/training/'  #  directory of your training dataset
 
 # Split files
 SPLIT:
-  TRAIN: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_train.txt'  # training lists of your training set
-  VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_val.txt'  # training lists of your validation set
-  LEFT: '0128_irL_kuafuv2_half.png'
+  TRAIN: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v11/training_lists/all_train.txt'  # training lists of your training set
+  VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v11/training_lists/all_val.txt'  # training lists of your validation set
+  LEFT: '0128_irL_kuafu_half.png'
   LEFT_NO_IR: '0128_irL_kuafu_half_no_ir.png'
-  RIGHT: '0128_irR_kuafuv2_half.png'
+  RIGHT: '0128_irR_kuafu_half.png'
   RIGHT_NO_IR: '0128_irR_kuafu_half_no_ir.png'
   DEPTHL: 'depthL.png'
   DEPTHR: 'depthR.png'
@@ -20,11 +20,11 @@ SPLIT:
 # Configuration for testing on real dataset
 REAL:
 #  FILE: '/isabella-fast/FeatureGAN/lists/newTrain.txt'
-  FILE: '/cephfs/datasets/iccv_pnp/messy-table-dataset/real_v9/training_lists/all.txt'
-  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/real_data_v10_temp/'  # path to your real testing dataset
-  LEFT: '1024_irL_real.png'
+  FILE: '/cephfs/datasets/iccv_pnp/messy-table-dataset/rand_scenes/train_list.txt'
+  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/rand_scenes/'  # path to your real testing dataset
+  LEFT: '1024_irL_real_360.png'
   LEFT_NO_IR: '1024_irL_real_off.png'
-  RIGHT: '1024_irR_real.png'
+  RIGHT: '1024_irR_real_360.png'
   RIGHT_NO_IR: '1024_irR_real_off.png'
 
 # Solver args

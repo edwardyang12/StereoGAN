@@ -10,17 +10,17 @@ cfg = _C
 
 # Directories
 _C.DIR = CN()
-_C.DIR.DATASET = '/code/dataset_local_v9/training'  #  directory of your training dataset
+_C.DIR.DATASET = '/code/dataset_local_v10/training'  #  directory of your training dataset
 
 # Split files
 _C.SPLIT = CN()
-_C.SPLIT.TRAIN = '/code/dataset_local_v9/training_lists/all_train.txt'  # training lists of your training dataset
-_C.SPLIT.VAL = '/code/dataset_local_v9/training_lists/all_val.txt'  # training lists of your validation dataset
+_C.SPLIT.TRAIN = '/code/dataset_local_v10/training_lists/all_train.txt'  # training lists of your training dataset
+_C.SPLIT.VAL = '/code/dataset_local_v10/training_lists/all_val.txt'  # training lists of your validation dataset
 _C.SPLIT.OBJ_NUM = 18  # Note: table + ground - 17th
 
-_C.SPLIT.LEFT = '0128_irL_kuafuv2_half.png'
+_C.SPLIT.LEFT = '0128_irL_kuafu_half.png'
 _C.SPLIT.LEFT_NO_IR = '0128_irL_kuafu_half_no_ir.png'
-_C.SPLIT.RIGHT = '0128_irR_kuafuv2_half.png'
+_C.SPLIT.RIGHT = '0128_irR_kuafu_half.png'
 _C.SPLIT.RIGHT_NO_IR = '0128_irR_kuafu_half_no_ir.png'
 _C.SPLIT.DEPTH = 'depth.png'
 _C.SPLIT.DEPTHL = 'depthL.png'
@@ -33,13 +33,15 @@ _C.SPLIT.REAL_REALSENSE = '1024_depth_real.png'
 
 # Configuration for testing on real dataset
 _C.REAL = CN()
-_C.REAL.FILE = '/code/dataset_local_v9/training_lists/newTrain.txt'
+_C.REAL.FILE = '/code/rand_scenes/train_list.txt'
 _C.REAL.DATASET_V9 = '/code/real_dataset_local_v9'
-_C.REAL.DATASET = '/code/real_dataset_local_v10'  # path to your real testing dataset
-_C.REAL.LEFT = '1024_irL_real.png'
+_C.REAL.DATASET = '/code/rand_scenes'  # path to your real testing dataset
+_C.REAL.LEFT = '1024_irL_real_360.png'
 _C.REAL.LEFT_NO_IR = '1024_irL_real_off.png'
-_C.REAL.RIGHT = '1024_irR_real.png'
+_C.REAL.LEFT_TEMPORAL_IR = '1024_irL_real_temporal.png'
+_C.REAL.RIGHT = '1024_irR_real_360.png'
 _C.REAL.RIGHT_NO_IR = '1024_irR_real_off.png'
+_C.REAL.RIGHT_TEMPORAL_IR = '1024_irR_real_temporal.png'
 _C.REAL.PAD_WIDTH = 960
 _C.REAL.PAD_HEIGHT = 544
 _C.REAL.MASK_FILE = '/code/real_masks/all.txt'

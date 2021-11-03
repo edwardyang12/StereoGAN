@@ -1,6 +1,6 @@
 """
-Author: Isabella Liu 10/13/21
-Feature: Train PSMNet Image reprojection
+Author: Isabella Liu 11/1/21
+Feature: Train PSMNet only using IR reprojection
 """
 import gc
 import os
@@ -14,10 +14,11 @@ import torch.nn.functional as F
 
 from datasets.messytable import MessytableDataset
 from nets.psmnet import PSMNet
+from nets.cycle_gan import CycleGANModel
 from nets.transformer import Transformer
 from utils.cascade_metrics import compute_err_metric
 from utils.warp_ops import apply_disparity_cu
-from utils.reprojection import get_reprojection_error_old
+from utils.reprojection import get_reprojection_error, get_reprojection_error_old
 from utils.config import cfg
 from utils.reduce import set_random_seed, synchronize, AverageMeterDict, \
     tensor2float, tensor2numpy, reduce_scalar_outputs, make_nograd_func
@@ -36,7 +37,7 @@ parser.add_argument('--seed', type=int, default=1, metavar='S', help='Random see
 parser.add_argument("--local_rank", type=int, default=0, help='Rank of device in distributed training')
 parser.add_argument('--debug', action='store_true', help='Whether run in debug mode (will load less data)')
 parser.add_argument('--warp-op', action='store_true',default=True, help='whether use warp_op function to get disparity')
-parser.add_argument('--loss-ratio', type=float, default=1, help='Ratio between loss_G and loss_cascade')
+parser.add_argument('--loss-ratio', type=float, default=0, help='Ratio between loss_psmnet and loss_reprojection')
 parser.add_argument('--gaussian-blur', action='store_true',default=False, help='whether apply gaussian blur')
 parser.add_argument('--color-jitter', action='store_true',default=False, help='whether apply color jitter')
 
@@ -65,9 +66,9 @@ logger.info(f'Loaded config file: \'{args.config_file}\'')
 logger.info(f'Running with configs:\n{cfg}')
 logger.info(f'Running with {num_gpus} GPUs')
 
-# python -m torch.distributed.launch train_psmnet_reprojection.py --summary-freq 1 --save-freq 1 --logdir ../train_10_14_psmnet_reprojection/debug --debug
-# python -m torch.distributed.launch train_psmnet_reprojection.py --config-file configs/remote_train_steps.yaml --summary-freq 10 --save-freq 100 --logdir ../train_10_14_psmnet_reprojection/debug --debug
-# python -m torch.distributed.launch train_psmnet_reprojection.py --config-file configs/remote_train_primitive_steps.yaml --summary-freq 10 --save-freq 100 --logdir ../train_10_14_psmnet_reprojection/debug --debug
+# python -m torch.distributed.launch train_psmnet_ir_reprojection.py --summary-freq 1 --save-freq 1 --logdir ../train_10_14_psmnet_ir_reprojection/debug --debug
+# python -m torch.distributed.launch train_psmnet_ir_reprojection.py --config-file configs/remote_train_steps.yaml --summary-freq 10 --save-freq 100 --logdir ../train_10_21_psmnet_smooth_ir_reproj/debug --debug
+
 
 def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimizer,
           TrainImgLoader, ValImgLoader):
@@ -101,7 +102,6 @@ def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimiz
                     # Update PSMNet losses
                     scalar_outputs_psmnet.update({'lr': psmnet_optimizer.param_groups[0]['lr']})
                     save_scalars(summary_writer, 'train_psmnet', scalar_outputs_psmnet, global_step)
-
 
                 # Save checkpoints
                 if (global_step) % args.save_freq == 0:
@@ -137,20 +137,22 @@ def train_sample(sample, transformer_model, psmnet_model,
     img_R_ir_pattern = sample['img_R_ir_pattern'].to(cuda_device)
     img_real_L = sample['img_real_L'].to(cuda_device)  # [bs, 3, 2H, 2W]
     img_real_R = sample['img_real_R'].to(cuda_device)  # [bs, 3, 2H, 2W]
+    img_real_L_ir_pattern = sample['img_real_L_ir_pattern'].to(cuda_device)
+    img_real_R_ir_pattern = sample['img_real_R_ir_pattern'].to(cuda_device)
 
     # Train on simple Transformer
     img_L_transformed, img_R_transformed, img_real_L_transformed, img_real_R_transformed \
         = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
 
     # Train on PSMNet
-    disp_gt = sample['img_disp_l'].to(cuda_device)
+    disp_gt_l = sample['img_disp_l'].to(cuda_device)
     depth_gt = sample['img_depth_l'].to(cuda_device)  # [bs, 1, H, W]
     img_focal_length = sample['focal_length'].to(cuda_device)
     img_baseline = sample['baseline'].to(cuda_device)
 
     # Resize the 2x resolution disp and depth back to H * W
     # Note this should go before apply_disparity_cu
-    disp_gt = F.interpolate(disp_gt, scale_factor=0.5, mode='nearest',
+    disp_gt_l = F.interpolate(disp_gt_l, scale_factor=0.5, mode='nearest',
                              recompute_scale_factor=False)  # [bs, 1, H, W]
     depth_gt = F.interpolate(depth_gt, scale_factor=0.5, mode='nearest',
                              recompute_scale_factor=False)  # [bs, 1, H, W]
@@ -159,28 +161,27 @@ def train_sample(sample, transformer_model, psmnet_model,
         img_disp_r = sample['img_disp_r'].to(cuda_device)
         img_disp_r = F.interpolate(img_disp_r, scale_factor=0.5, mode='nearest',
                                    recompute_scale_factor=False)
-        disp_gt = apply_disparity_cu(img_disp_r, img_disp_r.type(torch.int))  # [bs, 1, H, W]
+        disp_gt_l = apply_disparity_cu(img_disp_r, img_disp_r.type(torch.int))  # [bs, 1, H, W]
         del img_disp_r
 
     # Get stereo loss on sim
-    mask = (disp_gt < cfg.ARGS.MAX_DISP) * (disp_gt > 0)  # Note in training we do not exclude bg
-    mask.detach()
+    mask = (disp_gt_l < cfg.ARGS.MAX_DISP) * (disp_gt_l > 0)  # Note in training we do not exclude bg
     if isTrain:
         pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
         sim_pred_disp = pred_disp3
-        loss_psmnet = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
-               + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
-               + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
+        loss_psmnet = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt_l[mask], reduction='mean') \
+               + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt_l[mask], reduction='mean') \
+               + F.smooth_l1_loss(pred_disp3[mask], disp_gt_l[mask], reduction='mean')
     else:
         with torch.no_grad():
             pred_disp = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
-            loss_psmnet = F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
+            loss_psmnet = F.smooth_l1_loss(pred_disp[mask], disp_gt_l[mask], reduction='mean')
 
-    # Get reprojection loss on sim image
-    sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error_old(img_L, img_R, sim_pred_disp, mask)
+    # Get reprojection loss on sim_ir_pattern
+    sim_ir_reproj_loss, sim_ir_warped, sim_ir_reproj_mask = get_reprojection_error_old(img_L_ir_pattern, img_R_ir_pattern, sim_pred_disp, mask)
 
-    # Backward on sim image reprojection
-    sim_loss = loss_psmnet * args.loss_ratio + sim_img_reproj_loss
+    # Backward on sim_ir_pattern reprojection
+    sim_loss = loss_psmnet * args.loss_ratio + sim_ir_reproj_loss
     if isTrain:
         transformer_optimizer.zero_grad()
         psmnet_optimizer.zero_grad()
@@ -188,43 +189,17 @@ def train_sample(sample, transformer_model, psmnet_model,
         psmnet_optimizer.step()
         transformer_optimizer.step()
 
-    # Get reprojection loss on real
-    img_L_transformed, img_R_transformed, img_real_L_transformed, img_real_R_transformed \
-        = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
-    if isTrain:
-        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
-        real_pred_disp = pred_disp3
-    else:
-        with torch.no_grad():
-            real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
-    real_img_reproj_loss, real_img_warped, real_img_reproj_mask = get_reprojection_error_old(img_real_L, img_real_R, real_pred_disp)
-
-    # Backward on real
-    if isTrain:
-        transformer_optimizer.zero_grad()
-        psmnet_optimizer.zero_grad()
-        real_img_reproj_loss.backward()
-        psmnet_optimizer.step()
-        transformer_optimizer.step()
-
     # Save reprojection outputs and images
     img_output_reproj = {
         'sim_reprojection': {
-            'target': img_L, 'warped': sim_img_warped, 'pred_disp': sim_pred_disp.repeat(1, 3, 1, 1), 'mask': sim_img_reproj_mask
+            'target': img_L_ir_pattern, 'warped': sim_ir_warped, 'pred_disp': sim_pred_disp, 'mask': sim_ir_reproj_mask
         },
-        'real_reprojection': {
-            'target': img_real_L, 'warped': real_img_warped, 'pred_disp': real_pred_disp.repeat(1, 3, 1, 1), 'mask': real_img_reproj_mask
-        }
     }
 
     # Compute stereo error metrics on sim
     pred_disp = sim_pred_disp
-    scalar_outputs_psmnet = {
-        'loss': loss_psmnet.item(),
-        'sim_reprojection_loss': sim_img_reproj_loss.item(),
-        'real_reprojection_loss': real_img_reproj_loss.item()
-    }
-    err_metrics = compute_err_metric(disp_gt,
+    scalar_outputs_psmnet = {'loss': loss_psmnet.item(), 'sim_reprojection_loss': sim_ir_reproj_loss.item()}
+    err_metrics = compute_err_metric(disp_gt_l,
                                      depth_gt,
                                      pred_disp,
                                      img_focal_length,
@@ -232,10 +207,10 @@ def train_sample(sample, transformer_model, psmnet_model,
                                      mask)
     scalar_outputs_psmnet.update(err_metrics)
     # Compute error images
-    pred_disp_err_np = disp_error_img(pred_disp[[0]], disp_gt[[0]], mask[[0]])
+    pred_disp_err_np = disp_error_img(pred_disp[[0]], disp_gt_l[[0]], mask[[0]])
     pred_disp_err_tensor = torch.from_numpy(np.ascontiguousarray(pred_disp_err_np[None].transpose([0, 3, 1, 2])))
     img_outputs_psmnet = {
-        'disp_gt': disp_gt[[0]].repeat([1, 3, 1, 1]),
+        'disp_gt_l': disp_gt_l[[0]].repeat([1, 3, 1, 1]),
         'disp_pred': pred_disp[[0]].repeat([1, 3, 1, 1]),
         'disp_err': pred_disp_err_tensor
     }

@@ -88,7 +88,7 @@ def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimiz
 
             do_summary = global_step % args.summary_freq == 0
             # Train one sample
-            scalar_outputs_reproj, scalar_outputs_psmnet, img_outputs_psmnet, img_output_reproj = \
+            scalar_outputs_psmnet, img_outputs_psmnet, img_output_reproj = \
                 train_sample(sample, transformer_model, psmnet_model, transformer_optimizer,
                              psmnet_optimizer, isTrain=True)
             # Save result to tensorboard
@@ -98,7 +98,6 @@ def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimiz
                 if do_summary:
                     # Update reprojection images
                     save_images_grid(summary_writer, 'train_reproj', img_output_reproj, global_step, nrow=4)
-                    save_scalars(summary_writer, 'train_reproj', scalar_outputs_reproj, global_step)
                     # Update PSMNet images
                     save_images(summary_writer, 'train_psmnet', img_outputs_psmnet, global_step)
                     # Update PSMNet losses
@@ -122,55 +121,6 @@ def train(transformer_model, psmnet_model, transformer_optimizer, psmnet_optimiz
                     total_err_metric_psmnet = avg_train_scalars_psmnet.mean()
                     logger.info(f'Step {global_step} train psmnet: {total_err_metric_psmnet}')
         gc.collect()
-
-        # # One epoch validation loop
-        # avg_val_scalars_gan = AverageMeterDict()
-        # avg_val_scalars_psmnet = AverageMeterDict()
-        # for batch_idx, sample in enumerate(ValImgLoader):
-        #     global_step = (len(ValImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE
-        #     do_summary = global_step % args.summary_freq == 0
-        #     scalar_outputs_gan, scalar_outputs_psmnet, img_outputs_gan, img_outputs_psmnet = \
-        #         train_sample(sample, gan_model, psmnet_model, psmnet_optimizer, isTrain=False)
-        #     if (not is_distributed) or (dist.get_rank() == 0):
-        #         scalar_outputs_gan = tensor2float(scalar_outputs_gan)
-        #         scalar_outputs_psmnet = tensor2float(scalar_outputs_psmnet)
-        #         avg_val_scalars_gan.update(scalar_outputs_gan)
-        #         avg_val_scalars_psmnet.update(scalar_outputs_psmnet)
-        #         if do_summary:
-        #             save_images_grid(summary_writer, 'val_gan', img_outputs_gan, global_step)
-        #             scalar_outputs_gan.update({'lr_G': gan_model.optimizer_G.param_groups[0]['lr']})
-        #             scalar_outputs_gan.update({'lr_D': gan_model.optimizer_D.param_groups[0]['lr']})
-        #             save_scalars_graph(summary_writer, 'val_gan', scalar_outputs_gan, global_step)
-        #             save_images(summary_writer, 'val_psmnet', img_outputs_psmnet, global_step)
-        #             scalar_outputs_psmnet.update({'lr': psmnet_optimizer.param_groups[0]['lr']})
-        #             save_scalars(summary_writer, 'val_psmnet', scalar_outputs_psmnet, global_step)
-        #
-        # if (not is_distributed) or (dist.get_rank() == 0):
-        #     # Get average results among all batches
-        #     total_err_metric_gan = avg_val_scalars_gan.mean()
-        #     total_err_metric_psmnet = avg_val_scalars_psmnet.mean()
-        #     logger.info(f'Epoch {epoch_idx} val   gan    : {total_err_metric_gan}')
-        #     logger.info(f'Epoch {epoch_idx} val   psmnet : {total_err_metric_psmnet}')
-        #
-        #     # Save best checkpoints
-        #     new_err = total_err_metric_psmnet['depth_abs_err'][0] if num_gpus > 1 \
-        #         else total_err_metric_psmnet['depth_abs_err']
-        #     if new_err < cur_err:
-        #         cur_err = new_err
-        #         checkpoint_data = {
-        #             'epoch': epoch_idx,
-        #             'G_A': gan_model.netG_A.state_dict(),
-        #             'G_B': gan_model.netG_B.state_dict(),
-        #             'D_A': gan_model.netD_A.state_dict(),
-        #             'D_B': gan_model.netD_B.state_dict(),
-        #             'PSMNet': psmnet_model.state_dict(),
-        #             'optimizerG': gan_model.optimizer_G.state_dict(),
-        #             'optimizerD': gan_model.optimizer_D.state_dict(),
-        #             'optimizerPSMNet': psmnet_optimizer.state_dict()
-        #         }
-        #         save_filename = os.path.join(args.logdir, 'models', f'model_best.pth')
-        #         torch.save(checkpoint_data, save_filename)
-        # gc.collect()
 
 
 def train_sample(sample, transformer_model, psmnet_model,
@@ -226,17 +176,13 @@ def train_sample(sample, transformer_model, psmnet_model,
                + F.smooth_l1_loss(pred_disp3[mask], disp_gt_l[mask], reduction='mean')
     else:
         with torch.no_grad():
-            pred_disp = psmnet_model(img_L_transformed, img_R_transformed)
+            pred_disp = psmnet_model(img_L, img_R, img_L_transformed, img_R_transformed)
             loss_psmnet = F.smooth_l1_loss(pred_disp[mask], disp_gt_l[mask], reduction='mean')
 
     # Get reprojection loss on sim_ir_pattern
     sim_ir_reproj_loss, sim_ir_warped, sim_ir_reproj_mask = get_reprojection_error_old(img_L_ir_pattern, img_R_ir_pattern, sim_pred_disp, mask)
-    # sim_img_reproj_loss, sim_img_warped, sim_img_reproj_mask = get_reprojection_error(img_L, img_R, sim_pred_disp, disp_gt_l)
-    # sim_img_transformed_reproj_loss, sim_img_transformed_warped = get_reprojection_error(img_L_transformed, img_R_transformed, sim_pred_disp)
 
     # Backward on sim_ir_pattern reprojection
-    # sim_loss_reproj = (sim_img_reproj_loss + sim_img_transformed_reproj_loss * 0.1) * 0.0001
-    # sim_loss = (loss_psmnet + sim_loss_reproj) / 2
     sim_loss = loss_psmnet * args.loss_ratio + sim_ir_reproj_loss
     if isTrain:
         transformer_optimizer.zero_grad()
@@ -249,13 +195,12 @@ def train_sample(sample, transformer_model, psmnet_model,
     img_L_transformed, img_R_transformed, img_real_L_transformed, img_real_R_transformed \
         = transformer_model(img_L, img_R, img_real_L, img_real_R)  # [bs, 3, H, W]
     if isTrain:
-        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
+        pred_disp1, pred_disp2, pred_disp3 = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
         real_pred_disp = pred_disp3
     else:
         with torch.no_grad():
-            real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_L_transformed)
+            real_pred_disp = psmnet_model(img_real_L, img_real_R, img_real_L_transformed, img_real_R_transformed)
     real_ir_reproj_loss, real_ir_warped, real_ir_reproj_mask = get_reprojection_error_old(img_real_L_ir_pattern, img_real_R_ir_pattern, real_pred_disp)
-    # real_img_transformed_reproj_loss, real_img_transformed_warped = get_reprojection_error(img_real_L_transformed, img_real_R_transformed, real_pred_disp)
 
     # Backward on real
     real_loss = real_ir_reproj_loss
@@ -275,12 +220,12 @@ def train_sample(sample, transformer_model, psmnet_model,
             'target': img_real_L_ir_pattern, 'warped': real_ir_warped, 'pred_disp': real_pred_disp, 'mask': real_ir_reproj_mask
         }
     }
-    scalar_outputs_reproj = {'sim_reproj_loss': sim_ir_reproj_loss.item(), 'real_reproj_loss': real_ir_reproj_loss.item()}
-
 
     # Compute stereo error metrics on sim
     pred_disp = sim_pred_disp
-    scalar_outputs_psmnet = {'loss': loss_psmnet.item(), 'sim_reprojection_loss': sim_ir_reproj_loss.item(), 'real_reprojection_loss': real_ir_reproj_loss.item()}
+    scalar_outputs_psmnet = {'loss': loss_psmnet.item(),
+                             'sim_reprojection_loss': sim_ir_reproj_loss.item(),
+                             'real_reprojection_loss': real_ir_reproj_loss.item()}
     err_metrics = compute_err_metric(disp_gt_l,
                                      depth_gt,
                                      pred_disp,
@@ -299,7 +244,7 @@ def train_sample(sample, transformer_model, psmnet_model,
 
     if is_distributed:
         scalar_outputs_psmnet = reduce_scalar_outputs(scalar_outputs_psmnet, cuda_device)
-    return scalar_outputs_reproj, scalar_outputs_psmnet, img_outputs_psmnet, img_output_reproj
+    return scalar_outputs_psmnet, img_outputs_psmnet, img_output_reproj
 
 
 if __name__ == '__main__':
