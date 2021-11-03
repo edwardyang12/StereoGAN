@@ -77,16 +77,14 @@ class MessytableTestDataset(Dataset):
 
     def __getitem__(self, idx):
         if self.onReal:
-            img_L_rgb = (np.array(Image.open(self.img_L_real[idx]).convert(mode='L'))[:, :, None] - 127.5) / 127.5
-            img_R_rgb = (np.array(Image.open(self.img_R_real[idx]).convert(mode='L'))[:, :, None] - 127.5) / 127.5
+            img_L_rgb = (np.array(Image.open(self.img_L_real[idx]).convert(mode='RGB'))/255. - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+            img_R_rgb = (np.array(Image.open(self.img_R_real[idx]).convert(mode='RGB'))/255. - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
             img_depth_realsense = np.array(Image.open(self.img_real_realsense[idx])) / 1000
         else:
-            img_L_rgb = (np.array(Image.open(self.img_L[idx]))[:, :, :1] - 127.5) / 127.5
-            img_R_rgb = (np.array(Image.open(self.img_R[idx]))[:, :, :1] - 127.5) / 127.5
-            img_L_rgb_real = (np.array(Image.open(self.img_L_real[idx]).convert(mode='L'))[:, :, None] - 127.5) / 127.5
-            img_R_rgb_real = (np.array(Image.open(self.img_R_real[idx]).convert(mode='L'))[:, :, None] - 127.5) / 127.5
-            img_depth_realsense = np.array(Image.open(self.img_sim_realsense[idx])) / 1000
-
+            img_L_rgb = (np.array(Image.open(self.img_L[idx]).convert(mode='RGB'))/255. - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+            img_R_rgb = (np.array(Image.open(self.img_R[idx]).convert(mode='RGB'))/255. - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+            img_L_rgb_real = (np.array(Image.open(self.img_L_real[idx]).convert(mode='RGB'))/255. - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+            img_R_rgb_real = (np.array(Image.open(self.img_R_real[idx]).convert(mode='RGB'))/255. - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
         img_depth_l = np.array(Image.open(self.img_depth_l[idx])) / 1000  # convert from mm to m
         img_depth_r = np.array(Image.open(self.img_depth_r[idx])) / 1000  # convert from mm to m
         img_meta = load_pickle(self.img_meta[idx])
