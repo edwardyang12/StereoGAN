@@ -2,14 +2,14 @@
 
 # Directories
 DIR:
-  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training'  #  directory of your training dataset
+  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v11/training/'  #  directory of your training dataset
 
 # Split files
 SPLIT:
   TRAIN: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_train.txt'  # training lists of your training set
   VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v9/training_lists/all_val.txt'  # training lists of your validation set
-  LEFT: '0128_irL_kuafuv2_half.png'
-  RIGHT: '0128_irR_kuafuv2_half.png'
+  LEFT: '0128_irL_kuafu_half.png'
+  RIGHT: '0128_irR_kuafu_half.png'
   DEPTHL: 'depthL.png'
   DEPTHR: 'depthR.png'
   META: 'meta.pkl'
