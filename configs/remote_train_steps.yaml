@@ -2,12 +2,12 @@
 
 # Directories
 DIR:
-  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v11/training/'  #  directory of your training dataset
+  DATASET: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v12/training/'  #  directory of your training dataset
 
 # Split files
 SPLIT:
-  TRAIN: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v11/training_lists/all_train.txt'  # training lists of your training set
-  VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v11/training_lists/all_val.txt'  # training lists of your validation set
+  TRAIN: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v12/training_lists/all_train.txt'  # training lists of your training set
+  VAL: '/cephfs/datasets/iccv_pnp/messy-table-dataset/v12/training_lists/all_val.txt'  # training lists of your validation set
   LEFT: '0128_irL_kuafu_half.png'
   RIGHT: '0128_irR_kuafu_half.png'
   DEPTHL: 'depthL.png'
@@ -26,8 +26,8 @@ SOLVER:
   LR_CASCADE: 0.001                         # base learning rate for cascade
   LR_G: 0.0002                              # base learning rate for G
   LR_D: 0.0002                              # base learning rate for D
-  LR_STEPS: '40000,80000,120000:2'    # the steps to decay lr: the downscale rate
-  STEPS: 160000                              # number of steps to train
+  LR_STEPS: '10000,20000,30000:2'    # the steps to decay lr: the downscale rate
+  STEPS: 50000                             # number of steps to train
   EPOCHS: 12
   BATCH_SIZE: 3                             # batch size
   NUM_WORKER: 1                               # num_worker in dataloader
