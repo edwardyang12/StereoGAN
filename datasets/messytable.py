@@ -149,7 +149,7 @@ class MessytableDataset(Dataset):
         img_depth_r = img_depth_r[2*x: 2*(x+th), 2*y: 2*(y+tw)]
         img_real_rgb = img_real_rgb[2*x: 2*(x+th), 2*y: 2*(y+tw)]  # real original res in 1080*1920
 
-        transforms = self.__data_augmentation__(True, True)
+        transforms = self.__data_augmentation__(False, False)
         item = {}
         item['img_L'] = transforms(img_L_rgb).to(torch.float32)
         item['img_R'] = transforms(img_R_rgb).to(torch.float32)
