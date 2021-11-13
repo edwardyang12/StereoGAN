@@ -73,7 +73,7 @@ def train(psmnet_model, psmnet_optimizer, TrainImgLoader, ValImgLoader):
         # One epoch training loop
         avg_train_scalars_psmnet = AverageMeterDict()
         for batch_idx, sample in enumerate(TrainImgLoader):
-            global_step = (len(TrainImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE * num_gpus
+            global_step = (len(TrainImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE
             if global_step > cfg.SOLVER.STEPS:
                 break
 
@@ -116,6 +116,7 @@ def train(psmnet_model, psmnet_optimizer, TrainImgLoader, ValImgLoader):
         avg_val_scalars_psmnet = AverageMeterDict()
         for batch_idx, sample in enumerate(ValImgLoader):
             global_step = (len(ValImgLoader) * epoch_idx + batch_idx) * cfg.SOLVER.BATCH_SIZE
+
             do_summary = global_step % args.summary_freq == 0
             scalar_outputs_psmnet, img_outputs_psmnet = \
                 train_sample(sample, psmnet_model, psmnet_optimizer, isTrain=False)
