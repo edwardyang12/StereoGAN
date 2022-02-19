@@ -36,6 +36,9 @@ parser.add_argument("--local_rank", type=int, default=0, help='Rank of device in
 parser.add_argument('--debug', action='store_true', help='Whether run in debug mode (will load less data)')
 parser.add_argument('--warp-op', action='store_true',default=True, help='whether use warp_op function to get disparity')
 
+parser.add_argument('--gaussian-blur', action='store_true',default=True, help='whether apply gaussian blur')
+parser.add_argument('--color-jitter', action='store_true',default=True, help='whether apply color jitter')
+
 args = parser.parse_args()
 cfg.merge_from_file(args.config_file)
 
@@ -96,7 +99,7 @@ def train(psmnet_model, psmnet_optimizer, TrainImgLoader, ValImgLoader):
                     save_scalars(summary_writer, 'train_psmnet', scalar_outputs_psmnet, global_step)
 
                 # Save checkpoints
-                if (global_step + 1) % args.save_freq == 0:
+                if (global_step) % args.save_freq == 0:
                     checkpoint_data = {
                         'epoch': epoch_idx,
                         'PSMNet': psmnet_model.state_dict(),
@@ -226,8 +229,8 @@ def train_sample(sample, psmnet_model, psmnet_optimizer, isTrain=True):
 
 if __name__ == '__main__':
     # Obtain dataloader
-    train_dataset = MessytableDataset(cfg.SPLIT.TRAIN, debug=args.debug, sub=600)
-    val_dataset = MessytableDataset(cfg.SPLIT.VAL, debug=args.debug, sub=100)
+    train_dataset = MessytableDataset(cfg.SPLIT.TRAIN, debug=args.debug, sub=600, gaussian_blur=True, color_jitter=True)
+    val_dataset = MessytableDataset(cfg.SPLIT.VAL, debug=args.debug, sub=100, gaussian_blur=True, color_jitter=True)
     if is_distributed:
         train_sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=dist.get_world_size(),
                                                             rank=dist.get_rank())
