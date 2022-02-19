@@ -220,8 +220,8 @@ def train_sample(sample, psmnet_model, psmnet_optimizer, isTrain=True):
 
 if __name__ == '__main__':
     # Obtain dataloader
-    train_dataset = MessytableDataset(cfg.SPLIT.TRAIN, debug=args.debug, sub=600)
-    val_dataset = MessytableDataset(cfg.SPLIT.VAL, debug=args.debug, sub=100)
+    train_dataset = MessytableDataset(cfg.SPLIT.TRAIN, debug=args.debug, sub=600, gaussian_blur=True, color_jitter=True)
+    val_dataset = MessytableDataset(cfg.SPLIT.VAL, debug=args.debug, sub=100, gaussian_blur=True, color_jitter=True)
     if is_distributed:
         train_sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=dist.get_world_size(),
                                                             rank=dist.get_rank())
