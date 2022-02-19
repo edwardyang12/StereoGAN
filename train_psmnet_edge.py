@@ -189,13 +189,20 @@ def train_sample(sample, psmnet_model, psmnet_optimizer, isTrain=True):
         loss = 0.5 * F.smooth_l1_loss(pred_disp1[mask], disp_gt[mask], reduction='mean') \
                + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
                + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
+        edge_loss = torch.abs(torch.autograd.grad(outputs=loss, inputs=xL, retain_graph=True)[0]).sum()
+        total_loss = loss + edge_loss.sum()/mask.sum()
+        scalar_outputs_psmnet = {'loss': loss.item(),
+                                  'edge_loss':edge_loss.item()/mask.sum().item(),
+                                  'total_loss':total_loss.item()}
     else:
         with torch.no_grad():
             pred_disp = psmnet_model(img_L, img_R)
             loss = F.smooth_l1_loss(pred_disp[mask], disp_gt[mask], reduction='mean')
+            total_loss = loss
+            scalar_outputs_psmnet = {'loss': loss.item(),
+                                      'total_loss':total_loss.item()}
 
-    edge_loss = torch.abs(torch.autograd.grad(outputs=loss, inputs=xL, retain_graph=True)[0]).sum()
-    total_loss = loss + edge_loss.sum()/mask.sum()
+
     # Backward and optimization
     if isTrain:
         psmnet_optimizer.zero_grad()
@@ -203,9 +210,7 @@ def train_sample(sample, psmnet_model, psmnet_optimizer, isTrain=True):
         psmnet_optimizer.step()                # update cascade weights
 
     # Compute error metrics
-    scalar_outputs_psmnet = {'loss': loss.item(),
-                              'edge_loss':edge_loss.item()/mask.sum().item(),
-                              'total_loss':total_loss.item()}
+
     err_metrics = compute_err_metric(disp_gt,
                                      depth_gt,
                                      pred_disp,
