@@ -190,7 +190,7 @@ def train_sample(sample, psmnet_model, psmnet_optimizer, isTrain=True):
                + 0.7 * F.smooth_l1_loss(pred_disp2[mask], disp_gt[mask], reduction='mean') \
                + F.smooth_l1_loss(pred_disp3[mask], disp_gt[mask], reduction='mean')
         edge_loss = torch.abs(torch.autograd.grad(outputs=loss, inputs=xL, retain_graph=True)[0]).sum()
-        total_loss = 0.1*loss + edge_loss.sum()/mask.sum()
+        total_loss = 0.01*loss + edge_loss.sum()/mask.sum()
         scalar_outputs_psmnet = {'loss': loss.item(),
                                   'edge_loss':edge_loss.item()/mask.sum().item(),
                                   'total_loss':total_loss.item()}
